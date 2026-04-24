@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import com.openjarvis.accessibility.JarvisAccessibilityService
 import com.openjarvis.accessibility.ScreenReader
+import com.openjarvis.graphify.AnalysisEngine
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.llm.UniversalAdapter
 import kotlinx.coroutines.CoroutineScope
@@ -18,6 +19,7 @@ import kotlinx.coroutines.withContext
 class AgentCore(private val context: Context) {
 
     private val graphifyRepo = GraphifyRepository(context)
+    private val analysisEngine = AnalysisEngine(context)
     private val universalAdapter = UniversalAdapter(context)
     private val screenReader = ScreenReader(context)
     private val scope = CoroutineScope(Dispatchers.IO)
@@ -70,12 +72,7 @@ RULES:
                 
                 _state.value = AgentState.Running("getting context...")
                 
-                val recentTasks = withContext(Dispatchers.IO) {
-                    graphifyRepo.getRecentTasks(5)
-                }
-                val memoryContext = recentTasks.joinToString("\n") { 
-                    "- ${it.command} → ${it.result}" 
-                }
+                val memoryContext = graphifyRepo.buildMemoryContext(command)
                 
                 val fullSystem = systemPrompt
                     .replace("{SCREEN_OCR}", screenText.take(2000))
@@ -115,6 +112,8 @@ RULES:
                             provider = universalAdapter.getProviderName(),
                             latencyMs = latency
                         )
+                        
+                        analysisEngine.analyzeLastTask()
                         
                         _state.value = AgentState.Done("done in ${latency}ms")
                     },

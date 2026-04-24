@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -53,6 +54,7 @@ fun FloatingOverlayWidget(
     agentState: AgentState,
     voiceManager: VoiceManager?,
     recentTasks: List<TaskNode>,
+    suggestions: List<String> = emptyList(),
     onCommand: (String) -> Unit,
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier
@@ -125,11 +127,15 @@ fun FloatingOverlayWidget(
                 onCommandTextChange = { commandText = it },
                 placeholderText = placeholderText,
                 recentTasks = recentTasks,
+                suggestions = suggestions,
                 onSend = {
                     if (commandText.isNotBlank()) {
                         onCommand(commandText)
                         commandText = ""
                     }
+                },
+                onSuggestionClick = { suggestion ->
+                    commandText = suggestion
                 },
                 onVoicePressStart = {
                     voiceManager?.startListening()
@@ -254,7 +260,9 @@ private fun ExpandedOverlay(
     onCommandTextChange: (String) -> Unit,
     placeholderText: String,
     recentTasks: List<TaskNode>,
+    suggestions: List<String> = emptyList(),
     onSend: () -> Unit,
+    onSuggestionClick: (String) -> Unit = {},
     onVoicePressStart: () -> Unit,
     onVoicePressEnd: () -> Unit,
     onCollapse: () -> Unit,
@@ -340,6 +348,14 @@ private fun ExpandedOverlay(
                 DividerLine()
 
                 Spacer(modifier = Modifier.height(12.dp))
+
+                if (suggestions.isNotEmpty() && agentState is AgentState.Idle) {
+                    SuggestionChips(
+                        suggestions = suggestions,
+                        onSuggestionClick = onSuggestionClick
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
                 InputRowWithVoice(
                     commandText = commandText,
@@ -672,5 +688,54 @@ private fun formatRelativeTime(timestamp: Long): String {
         minutes < 1 -> "now"
         minutes < 60 -> "${minutes}m"
         else -> "${minutes / 60}h"
+    }
+}
+
+@Composable
+private fun SuggestionChips(
+    suggestions: List<String>,
+    onSuggestionClick: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        suggestions.forEachIndexed { index, suggestion ->
+            var visible by remember { mutableStateOf(false) }
+
+            LaunchedEffect(Unit) {
+                delay(index * 60L)
+                visible = true
+            }
+
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(animationSpec = tween(200)) + 
+                        slideInHorizontally(
+                            initialOffsetX = { -it },
+                            animationSpec = tween(200)
+                        )
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .clickable { onSuggestionClick(suggestion) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = VoidColor.Void700
+                ) {
+                    Text(
+                        text = suggestion,
+                        style = TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = VoidColor.TextSecondary
+                        ),
+                        modifier = Modifier.padding(
+                            horizontal = 12.dp,
+                            vertical = 6.dp
+                        )
+                    )
+                }
+            }
+        }
     }
 }
