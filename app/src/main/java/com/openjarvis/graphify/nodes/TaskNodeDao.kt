@@ -13,6 +13,6 @@ interface TaskNodeDao {
     @Insert
     suspend fun insert(taskNode: TaskNode): Long
     
-    @Query("DELETE FROM task_nodes WHERE timestamp < : cutoff")
+    @Query("DELETE FROM task_nodes WHERE timestamp < :cutoff")
     suspend fun deleteOld(cutoff: Long)
 }
