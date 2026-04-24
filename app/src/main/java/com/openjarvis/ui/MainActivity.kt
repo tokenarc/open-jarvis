@@ -4,59 +4,67 @@ import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
-import android.view.accessibility.AccessibilityServiceInfo
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import com.openjarvis.R
+import androidx.core.view.WindowCompat
 import com.openjarvis.accessibility.JarvisAccessibilityService
+import com.openjarvis.agent.AgentCore
+import com.openjarvis.agent.AgentState
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.graphify.nodes.TaskNode
+import com.openjarvis.ui.dashboard.DashboardScreen
+import com.openjarvis.ui.settings.SettingsScreen
+import com.openjarvis.ui.theme.OpenJarvisTheme
 
 class MainActivity : ComponentActivity() {
     
-    private var graphifyRepo: GraphifyRepository? = null
+    private lateinit var graphifyRepo: GraphifyRepository
+    private lateinit var agentCore: AgentCore
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        
         graphifyRepo = GraphifyRepository(this)
+        agentCore = AgentCore(this)
         
         setContent {
-            val context = LocalContext.current
-            var recentTasks by remember { mutableStateOf<List<TaskNode>>(emptyList()) }
-            
-            LaunchedEffect(Unit) {
-                recentTasks = graphifyRepo?.getRecentTasks(10) ?: emptyList()
-            }
-            
-            val accessibilityEnabled = isAccessibilityServiceEnabled()
-            val overlayEnabled = Settings.canDrawOverlays(this)
-            
-            if (!accessibilityEnabled || !overlayEnabled) {
-                PermissionScreen(
-                    accessibilityEnabled = accessibilityEnabled,
-                    overlayEnabled = overlayEnabled,
-                    onEnableAccessibility = { startAccessibilitySettings() },
-                    onEnableOverlay = { startOverlaySettings() }
-                )
-            } else {
-                HomeScreen(
-                    recentTasks = recentTasks,
-                    onStartOverlay = { startOverlayService() },
-                    onOpenSettings = { openSettings() }
-                )
+            OpenJarvisTheme {
+                val context = LocalContext.current
+                var recentTasks by remember { mutableStateOf<List<TaskNode>>(emptyList()) }
+                
+                LaunchedEffect(Unit) {
+                    recentTasks = graphifyRepo.getRecentTasks(10)
+                }
+                
+                val accessibilityEnabled = isAccessibilityServiceEnabled()
+                val overlayEnabled = Settings.canDrawOverlays(this)
+                
+                val agentState by agentCore.state.collectAsState()
+                
+                if (!accessibilityEnabled || !overlayEnabled) {
+                    PermissionScreen(
+                        accessibilityEnabled = accessibilityEnabled,
+                        overlayEnabled = overlayEnabled,
+                        onEnableAccessibility = { startAccessibilitySettings() },
+                        onEnableOverlay = { startOverlaySettings() }
+                    )
+                } else {
+                    DashboardScreen(
+                        onStartOverlay = { startOverlayService() },
+                        onOpenSettings = { openSettings() },
+                        graphifyRepo = graphifyRepo,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }
@@ -82,7 +90,7 @@ class MainActivity : ComponentActivity() {
     
     private fun startOverlayService() {
         startService(Intent(this, OverlayService::class.java))
-        Toast.makeText(this, R.string.jarvis_active, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Jarvis is active", Toast.LENGTH_SHORT).show()
     }
     
     private fun openSettings() {
@@ -97,151 +105,59 @@ fun PermissionScreen(
     onEnableAccessibility: () -> Unit,
     onEnableOverlay: () -> Unit
 ) {
-    Column(
+    val primaryColor = com.openjarvis.ui.theme.VoidColor.Violet
+    val onSurfaceColor = com.openjarvis.ui.theme.VoidColor.TextPrimary
+    val onSurfaceVariantColor = com.openjarvis.ui.theme.VoidColor.TextSecondary
+    
+    androidx.compose.foundation.layout.Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
     ) {
-        Text(
-            text = stringResource(R.string.permission_required),
-            style = MaterialTheme.typography.headlineMedium
+        androidx.compose.material3.Text(
+            text = "Permission Required",
+            style = androidx.compose.material3.MaterialTheme.typography.headlineMedium,
+            color = onSurfaceColor
         )
         
-        Spacer(modifier = Modifier.height(16.dp))
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
         
-        Text(
-            text = stringResource(R.string.permissions_explained),
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center
+        androidx.compose.material3.Text(
+            text = "Open Jarvis needs accessibility and overlay permissions to control your device.",
+            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+            color = onSurfaceVariantColor,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
         
-        Spacer(modifier = Modifier.height(32.dp))
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(32.dp))
         
         if (!accessibilityEnabled) {
-            Button(
+            androidx.compose.material3.Button(
                 onClick = onEnableAccessibility,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(stringResource(R.string.enable_accessibility))
+                androidx.compose.material3.Text("Enable Accessibility Service")
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
         }
         
         if (!overlayEnabled) {
-            Button(
+            androidx.compose.material3.Button(
                 onClick = onEnableOverlay,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(stringResource(R.string.enable_overlay))
+                androidx.compose.material3.Text("Enable Overlay Permission")
             }
         }
         
         if (accessibilityEnabled && overlayEnabled) {
-            Text(
-                text = stringResource(R.string.jarvis_active),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
-
-@Composable
-fun HomeScreen(
-    recentTasks: List<TaskNode>,
-    onStartOverlay: () -> Unit,
-    onOpenSettings: () -> Unit
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
-                actions = {
-                    TextButton(onClick = onOpenSettings) {
-                        Text(stringResource(R.string.settings))
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-        ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = stringResource(R.string.jarvis_active),
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = onStartOverlay) {
-                        Text("Launch Command Overlay")
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Text(
-                text = stringResource(R.string.recent_tasks),
-                style = MaterialTheme.typography.titleMedium
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            if (recentTasks.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.no_recent_tasks),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.typography.bodySmall.color
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(recentTasks) { task ->
-                        TaskItem(task = task)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun TaskItem(task: TaskNode) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp)
-        ) {
-            Text(
-                text = task.command,
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                text = task.result,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            androidx.compose.material3.Text(
+                text = "Jarvis is active",
+                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                color = primaryColor
             )
         }
     }
