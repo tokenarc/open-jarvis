@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Open Jarvis</string>
+    <string name="accessibility_description">Open Jarvis uses accessibility to control your apps and perform actions on your device. This service is required for the AI agent to tap, type, and navigate apps.</string>
+    <string name="accessibility_service_label">Open Jarvis</string>
+    <string name="notification_channel_name">Jarvis Assistant</string>
+    <string name="notification_channel_description">Shows when Jarvis is active and listening for commands</string>
+    <string name="notification_title">Open Jarvis Active</string>
+    <string name="notification_text">Tap to give a command</string>
+    <string name="permission_required">Permission Required</string>
+    <string name="enable_accessibility">Enable Accessibility Service</string>
+    <string name="enable_overlay">Enable Overlay Permission</string>
+    <string name="grant_permissions">Grant Permissions</string>
+    <string name="permissions_explained">Open Jarvis needs accessibility permissions to control apps and overlay permission to show the command button.</string>
+    <string name="jarvis_active">Jarvis is active</string>
+    <string name="recent_tasks">Recent Tasks</string>
+    <string name="settings">Settings</string>
+    <string name="llm_provider">LLM Provider</string>
+    <string name="base_url">Base URL</string>
+    <string name="api_key">API Key</string>
+    <string name="model_name">Model Name</string>
+    <string name="voice_input">Voice Input</string>
+    <string name="coming_soon">Coming in M2</string>
+    <string name="about">About</string>
+    <string name="github_link">View on GitHub</string>
+    <string name="command_hint">Type a command (e.g., "open WhatsApp")</string>
+    <string name="send">Send</string>
+    <string name="idle">Idle</string>
+    <string name="running">Running</string>
+    <string name="done">Done</string>
+    <string name="error">Error</string>
+    <string name="select_provider">Select Provider</string>
+    <string name="custom">Custom</string>
+    <string name="groq">Groq</string>
+    <string name="gemini">Google Gemini</string>
+    <string name="openrouter">OpenRouter</string>
+    <string name="anthropic">Anthropic Claude</string>
+    <string name="openai">OpenAI</string>
+    <string name="ollama">Ollama (Local)</string>
+    <string name="no_recent_tasks">No recent tasks</string>
+    <string name="app_opened">Opened %1$s</string>
+    <string name="task_completed">Task completed</string>
+    <string name="task_failed">Task failed: %1$s</string>
+</resources>
