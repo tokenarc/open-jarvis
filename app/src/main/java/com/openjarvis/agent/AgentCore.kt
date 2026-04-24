@@ -139,6 +139,12 @@ RULES:
     suspend fun testConnection(): Result<Long> {
         return universalAdapter.testConnection()
     }
+    
+    fun getCurrentProviderName(): String {
+        return universalAdapter.getProviderName()
+    }
+    
+    fun getStateFlow(): StateFlow<AgentState> = state
 
     private suspend fun executeActions(actions: List<Action>) {
         for ((index, action) in actions.withIndex()) {

@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat
 import com.openjarvis.R
 import com.openjarvis.agent.AgentCore
 import com.openjarvis.agent.AgentState
+import com.openjarvis.bridge.SocketServer
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.graphify.nodes.TaskNode
 import com.openjarvis.ui.overlay.FloatingOverlayWidget
@@ -34,6 +35,7 @@ class OverlayService : Service() {
     private lateinit var agentCore: AgentCore
     private lateinit var voiceManager: VoiceManager
     private lateinit var graphifyRepo: GraphifyRepository
+    private lateinit var socketServer: SocketServer
     private var stateCollectJob: Job? = null
     private var recentTasks = emptyList<TaskNode>()
 
@@ -43,8 +45,11 @@ class OverlayService : Service() {
         agentCore = AgentCore(this)
         voiceManager = VoiceManager(this)
         graphifyRepo = GraphifyRepository(this)
+        socketServer = SocketServer(this, agentCore, graphifyRepo)
         
         startForeground(NOTIFICATION_ID, createNotification())
+        
+        socketServer.start()
         
         // Load recent tasks
         CoroutineScope(Dispatchers.IO).launch {
@@ -61,6 +66,7 @@ class OverlayService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         stateCollectJob?.cancel()
+        socketServer.stop()
         voiceManager.release()
     }
 

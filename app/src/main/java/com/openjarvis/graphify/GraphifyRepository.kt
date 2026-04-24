@@ -225,4 +225,21 @@ class GraphifyRepository(context: Context) {
         val tasksToday: Int,
         val failRate: Float
     )
+    
+    suspend fun getProviderStats(): List<ProviderStats> = withContext(Dispatchers.IO) {
+        val providers = providerNodeDao.getTopProviders(10)
+        providers.map { p ->
+            ProviderStats(
+                name = p.providerName,
+                useCount = p.useCount,
+                successRate = if (p.useCount > 0) p.successCount.toFloat() / p.useCount else 0f
+            )
+        }
+    }
+    
+    data class ProviderStats(
+        val name: String,
+        val useCount: Int,
+        val successRate: Float
+    )
 }
