@@ -4,10 +4,13 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pointerInput
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -15,8 +18,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -27,7 +32,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -40,12 +44,14 @@ import androidx.compose.ui.unit.sp
 import com.openjarvis.agent.AgentState
 import com.openjarvis.graphify.nodes.TaskNode
 import com.openjarvis.ui.theme.VoidColor
+import com.openjarvis.voice.VoiceManager
+import com.openjarvis.voice.VoiceManager.VoiceState
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 @Composable
 fun FloatingOverlayWidget(
     agentState: AgentState,
+    voiceManager: VoiceManager?,
     recentTasks: List<TaskNode>,
     onCommand: (String) -> Unit,
     onCollapse: () -> Unit,
@@ -55,7 +61,10 @@ fun FloatingOverlayWidget(
     var commandText by remember { mutableStateOf("") }
     var hasAnimatedOnce by remember { mutableStateOf(false) }
     var placeholderText by remember { mutableStateOf("") }
-    
+    var isRecording by remember { mutableStateOf(false) }
+
+    val voiceState by voiceManager?.state?.collectAsState() ?: remember { mutableStateOf(VoiceState.Idle) }
+
     LaunchedEffect(isExpanded) {
         if (isExpanded && !hasAnimatedOnce) {
             hasAnimatedOnce = true
@@ -66,7 +75,16 @@ fun FloatingOverlayWidget(
             }
         }
     }
-    
+
+    // Update recording state from voice state
+    LaunchedEffect(voiceState) {
+        isRecording = voiceState is VoiceState.Recording
+        if (voiceState is VoiceState.Result) {
+            // Auto-fill transcribed text
+            commandText = (voiceState as VoiceState.Result).text
+        }
+    }
+
     AnimatedContent(
         targetState = isExpanded,
         transitionSpec = {
@@ -101,6 +119,8 @@ fun FloatingOverlayWidget(
         if (expanded) {
             ExpandedOverlay(
                 agentState = agentState,
+                voiceState = voiceState,
+                voiceManager = voiceManager,
                 commandText = commandText,
                 onCommandTextChange = { commandText = it },
                 placeholderText = placeholderText,
@@ -111,7 +131,17 @@ fun FloatingOverlayWidget(
                         commandText = ""
                     }
                 },
+                onVoicePressStart = {
+                    voiceManager?.startListening()
+                },
+                onVoicePressEnd = {
+                    val text = voiceManager?.stopListening()
+                    if (!text.isNullOrBlank()) {
+                        commandText = text
+                    }
+                },
                 onCollapse = {
+                    voiceManager?.stopSpeaking()
                     isExpanded = false
                     onCollapse()
                 },
@@ -134,7 +164,7 @@ private fun CollapsedPill(
     modifier: Modifier = Modifier
 ) {
     var glowAlpha by remember { mutableFloatStateOf(0.15f) }
-    
+
     LaunchedEffect(Unit) {
         infiniteTransition.animateFloat(
             initialValue = 0.15f,
@@ -145,7 +175,7 @@ private fun CollapsedPill(
             )
         ) { glowAlpha = this }
     }
-    
+
     val statusScale by rememberInfiniteTransition(label = "status").animateFloat(
         initialValue = 0.75f,
         targetValue = 1f,
@@ -155,14 +185,14 @@ private fun CollapsedPill(
         ),
         label = "scale"
     )
-    
+
     val statusColor = when (agentState) {
         is AgentState.Idle -> VoidColor.Violet
         is AgentState.Running -> VoidColor.Cyan
         is AgentState.Done -> VoidColor.Green
         is AgentState.Error -> VoidColor.Red
     }
-    
+
     Surface(
         modifier = modifier
             .width(140.dp)
@@ -181,7 +211,7 @@ private fun CollapsedPill(
                 cornerRadius = CornerRadius(999.dp.toPx())
             )
         }
-        
+
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -198,9 +228,9 @@ private fun CollapsedPill(
                     drawCircle(color = statusColor)
                 }
             }
-            
+
             Spacer(modifier = Modifier.width(8.dp))
-            
+
             Text(
                 text = "JARVIS",
                 style = TextStyle(
@@ -218,11 +248,15 @@ private fun CollapsedPill(
 @Composable
 private fun ExpandedOverlay(
     agentState: AgentState,
+    voiceState: VoiceState,
+    voiceManager: VoiceManager?,
     commandText: String,
     onCommandTextChange: (String) -> Unit,
     placeholderText: String,
     recentTasks: List<TaskNode>,
     onSend: () -> Unit,
+    onVoicePressStart: () -> Unit,
+    onVoicePressEnd: () -> Unit,
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -232,21 +266,17 @@ private fun ExpandedOverlay(
         is AgentState.Error -> agentState.message
         else -> ""
     }
-    
+
     LaunchedEffect(agentState) {
-        when (agentState) {
-            is AgentState.Done -> {
-                delay(2000)
-                onCollapse()
-            }
-            is AgentState.Error -> {
-                delay(4000)
-                onCollapse()
-            }
-            else -> {}
+        if (agentState is AgentState.Done) {
+            delay(2000)
+            onCollapse()
+        } else if (agentState is AgentState.Error) {
+            delay(4000)
+            onCollapse()
         }
     }
-    
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -262,14 +292,14 @@ private fun ExpandedOverlay(
                     .height(2.dp)
                     .background(VoidColor.Violet)
             )
-            
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(30.dp)
                     .background(VoidColor.Violet.copy(alpha = 0.2f))
             )
-            
+
             Column(
                 modifier = Modifier.padding(16.dp)
             ) {
@@ -291,7 +321,7 @@ private fun ExpandedOverlay(
                             )
                         )
                     }
-                    
+
                     IconButton(onClick = onCollapse) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
@@ -300,30 +330,33 @@ private fun ExpandedOverlay(
                         )
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 StatusLine(state = agentState, stepText = stepText)
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 DividerLine()
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
-                InputRow(
+
+                InputRowWithVoice(
                     commandText = commandText,
                     onCommandTextChange = onCommandTextChange,
                     placeholderText = if (commandText.isEmpty()) placeholderText else "",
+                    voiceState = voiceState,
+                    onVoicePressStart = onVoicePressStart,
+                    onVoicePressEnd = onVoicePressEnd,
                     onSend = onSend
                 )
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 DividerLine()
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 TaskLogWidget(tasks = recentTasks.take(3))
             }
         }
@@ -333,7 +366,7 @@ private fun ExpandedOverlay(
 @Composable
 private fun StatusOrb(state: AgentState) {
     val infiniteTransition = rememberInfiniteTransition(label = "orb")
-    
+
     val scale by infiniteTransition.animateFloat(
         initialValue = 0.7f,
         targetValue = 1f,
@@ -343,14 +376,14 @@ private fun StatusOrb(state: AgentState) {
         ),
         label = "orb_scale"
     )
-    
+
     val color = when (state) {
         is AgentState.Idle -> VoidColor.Violet
         is AgentState.Running -> VoidColor.Cyan
         is AgentState.Done -> VoidColor.Green
         is AgentState.Error -> VoidColor.Red
     }
-    
+
     Box(
         modifier = Modifier
             .size(8.dp)
@@ -374,14 +407,14 @@ private fun StatusLine(state: AgentState, stepText: String) {
         ),
         label = "cursor_alpha"
     )
-    
+
     val textColor = when (state) {
         is AgentState.Idle -> VoidColor.TextDisabled
         is AgentState.Running -> VoidColor.Cyan
         is AgentState.Done -> VoidColor.Green
         is AgentState.Error -> VoidColor.Red
     }
-    
+
     Row(
         modifier = Modifier.height(28.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -400,7 +433,7 @@ private fun StatusLine(state: AgentState, stepText: String) {
                 color = textColor
             )
         )
-        
+
         if (state is AgentState.Idle) {
             Box(
                 modifier = Modifier
@@ -413,18 +446,90 @@ private fun StatusLine(state: AgentState, stepText: String) {
 }
 
 @Composable
-private fun InputRow(
+private fun InputRowWithVoice(
     commandText: String,
     onCommandTextChange: (String) -> Unit,
     placeholderText: String,
+    voiceState: VoiceState,
+    onVoicePressStart: () -> Unit,
+    onVoicePressEnd: () -> Unit,
     onSend: () -> Unit
 ) {
+    val isRecording = voiceState is VoiceState.Recording
+    val isTranscribing = voiceState is VoiceState.Transcribing
+
+    val scale by animateFloatAsState(
+        targetValue = if (isRecording) 1.15f else 1f,
+        animationSpec = spring(stiffness = 400f, dampingRatio = 0.5f)
+    )
+
+    val glowAlpha by animateFloatAsState(
+        targetValue = if (isRecording) 0.6f else 0f,
+        animationSpec = tween(200)
+    )
+
+    val bgColor by animateColorAsState(
+        targetValue = when {
+            isRecording -> VoidColor.Red
+            isTranscribing -> VoidColor.Amber
+            else -> VoidColor.Void700
+        },
+        animationSpec = tween(200)
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Voice button
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .scale(scale)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            onVoicePressStart()
+                            tryAwaitRelease()
+                            onVoicePressEnd()
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            if (glowAlpha > 0f) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = VoidColor.Red.copy(alpha = glowAlpha * 0.3f),
+                            shape = CircleShape
+                        )
+                )
+            }
+
+            Surface(
+                shape = CircleShape,
+                color = bgColor,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Voice input",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .size(18.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
         Text(
             text = "›",
             style = TextStyle(
@@ -433,9 +538,9 @@ private fun InputRow(
                 color = VoidColor.Violet
             )
         )
-        
-        Spacer(modifier = Modifier.width(16.dp))
-        
+
+        Spacer(modifier = Modifier.width(8.dp))
+
         BasicTextField(
             value = commandText,
             onValueChange = onCommandTextChange,
@@ -468,16 +573,13 @@ private fun InputRow(
                 }
             }
         )
-        
+
         Spacer(modifier = Modifier.width(8.dp))
-        
-        val sendButtonScale = remember { Animatable(1f) }
+
         val sendButtonColor = if (commandText.isEmpty()) VoidColor.Void700 else VoidColor.Violet
-        
+
         Surface(
-            modifier = Modifier
-                .size(36.dp)
-                .scale(sendButtonScale.value),
+            modifier = Modifier.size(36.dp),
             shape = RoundedCornerShape(8.dp),
             color = sendButtonColor,
             onClick = onSend
@@ -508,12 +610,12 @@ private fun TaskLogWidget(tasks: List<TaskNode>) {
     Column(modifier = Modifier.heightIn(max = 80.dp)) {
         tasks.forEachIndexed { index, task ->
             var visible by remember { mutableStateOf(false) }
-            
+
             LaunchedEffect(Unit) {
                 delay((index * 80).toLong())
                 visible = true
             }
-            
+
             AnimatedVisibility(
                 visible = visible,
                 enter = slideInVertically { -24 } + fadeIn()
@@ -534,9 +636,9 @@ private fun TaskLogWidget(tasks: List<TaskNode>) {
                                 shape = RoundedCornerShape(3.dp)
                             )
                     )
-                    
+
                     Spacer(modifier = Modifier.width(8.dp))
-                    
+
                     Text(
                         text = task.command,
                         style = TextStyle(
@@ -546,9 +648,9 @@ private fun TaskLogWidget(tasks: List<TaskNode>) {
                         ),
                         maxLines = 1
                     )
-                    
+
                     Spacer(modifier = Modifier.weight(1f))
-                    
+
                     Text(
                         text = formatRelativeTime(task.timestamp),
                         style = TextStyle(

@@ -10,17 +10,17 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.IBinder
 import android.view.Gravity
-import android.view.LayoutInflater
-import android.view.MotionEvent
-import android.view.View
 import android.view.WindowManager
-import android.widget.Button
-import android.widget.EditText
-import android.widget.TextView
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.core.app.NotificationCompat
 import com.openjarvis.R
 import com.openjarvis.agent.AgentCore
 import com.openjarvis.agent.AgentState
+import com.openjarvis.graphify.GraphifyRepository
+import com.openjarvis.graphify.nodes.TaskNode
+import com.openjarvis.ui.overlay.FloatingOverlayWidget
+import com.openjarvis.voice.VoiceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,18 +30,26 @@ import kotlinx.coroutines.launch
 class OverlayService : Service() {
 
     private var windowManager: WindowManager? = null
-    private var floatingView: View? = null
-    private var expandedView: View? = null
-    private var isExpanded = false
     
     private lateinit var agentCore: AgentCore
+    private lateinit var voiceManager: VoiceManager
+    private lateinit var graphifyRepo: GraphifyRepository
     private var stateCollectJob: Job? = null
+    private var recentTasks = emptyList<TaskNode>()
 
     override fun onCreate() {
         super.onCreate()
+        
         agentCore = AgentCore(this)
+        voiceManager = VoiceManager(this)
+        graphifyRepo = GraphifyRepository(this)
+        
         startForeground(NOTIFICATION_ID, createNotification())
-        createFloatingButton()
+        
+        // Load recent tasks
+        CoroutineScope(Dispatchers.IO).launch {
+            recentTasks = graphifyRepo.getRecentTasks(10)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -53,7 +61,7 @@ class OverlayService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         stateCollectJob?.cancel()
-        floatingView?.let { windowManager?.removeView(it) }
+        voiceManager.release()
     }
 
     private fun createNotification(): Notification {
@@ -84,131 +92,18 @@ class OverlayService : Service() {
             .build()
     }
 
-    private fun createFloatingButton() {
-        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+    fun getAgentCore() = agentCore
+    fun getVoiceManager() = voiceManager
+    fun getRecentTasks() = recentTasks
+
+    fun executeCommand(command: String) {
+        agentCore.executeTask(command)
         
-        val layoutParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.END
-            x = 0
-            y = 200
+        // Refresh tasks after execution
+        CoroutineScope(Dispatchers.IO).launch {
+            delay(1000)
+            recentTasks = graphifyRepo.getRecentTasks(10)
         }
-
-        floatingView = LayoutInflater.from(this).inflate(R.layout.overlay_floating, null)
-        
-        floatingView?.setOnTouchListener(object : View.OnTouchListener {
-            private var initialX = 0
-            private var initialY = 0
-            private var initialTouchX = 0f
-            private var initialTouchY = 0f
-
-            override fun onTouch(v: View, event: MotionEvent): Boolean {
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        initialX = layoutParams.x
-                        initialY = layoutParams.y
-                        initialTouchX = event.rawX
-                        initialTouchY = event.rawY
-                        return true
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        layoutParams.x = initialX - (event.rawX - initialTouchX).toInt()
-                        layoutParams.y = initialY + (event.rawY - initialTouchY).toInt()
-                        windowManager?.updateViewLayout(floatingView, layoutParams)
-                        return true
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        val deltaX = kotlin.math.abs(event.rawX - initialTouchX)
-                        val deltaY = kotlin.math.abs(event.rawY - initialTouchY)
-                        if (deltaX < 10 && deltaY < 10) {
-                            toggleExpanded()
-                        }
-                        return true
-                    }
-                }
-                return false
-            }
-        })
-
-        windowManager?.addView(floatingView, layoutParams)
-    }
-
-    private fun toggleExpanded() {
-        if (isExpanded) {
-            collapseOverlay()
-        } else {
-            expandOverlay()
-        }
-        isExpanded = !isExpanded
-    }
-
-    private fun expandOverlay() {
-        val layoutParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.CENTER
-        }
-
-        expandedView = LayoutInflater.from(this).inflate(R.layout.overlay_expanded, null)
-        
-        val commandInput = expandedView?.findViewById<EditText>(R.id.command_input)
-        val sendButton = expandedView?.findViewById<Button>(R.id.send_button)
-        val statusText = expandedView?.findViewById<TextView>(R.id.status_text)
-        val minimizeButton = expandedView?.findViewById<Button>(R.id.minimize_button)
-
-        sendButton?.setOnClickListener {
-            val command = commandInput?.text?.toString() ?: ""
-            if (command.isNotBlank()) {
-                statusText?.text = getString(R.string.running)
-                agentCore.executeTask(command)
-                commandInput.text?.clear()
-                
-                stateCollectJob?.cancel()
-                stateCollectJob = CoroutineScope(Dispatchers.Main).launch {
-                    agentCore.state.collect { state ->
-                        when (state) {
-                            is AgentState.Idle -> statusText?.text = getString(R.string.idle)
-                            is AgentState.Running -> statusText?.text = getString(R.string.running)
-                            is AgentState.Done -> {
-                                statusText?.text = getString(R.string.done)
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    delay(1500)
-                                    collapseOverlay()
-                                    isExpanded = false
-                                }
-                            }
-                            is AgentState.Error -> {
-                                statusText?.text = getString(R.string.error)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        minimizeButton?.setOnClickListener {
-            collapseOverlay()
-            isExpanded = false
-        }
-
-        floatingView?.visibility = View.GONE
-        windowManager?.addView(expandedView, layoutParams)
-    }
-
-    private fun collapseOverlay() {
-        stateCollectJob?.cancel()
-        expandedView?.let { windowManager?.removeView(it) }
-        expandedView = null
-        floatingView?.visibility = View.VISIBLE
     }
 
     companion object {

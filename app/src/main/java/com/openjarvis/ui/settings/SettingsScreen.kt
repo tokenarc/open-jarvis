@@ -49,6 +49,10 @@ fun SettingsScreen(
     var showPassword by remember { mutableStateOf(false) }
     var lastSaved by remember { mutableStateOf(0L) }
     var savedVisible by remember { mutableStateOf(false) }
+    var voiceEnabled by remember { mutableStateOf(false) }
+    var speakResults by remember { mutableStateOf(true) }
+    var speechRate by remember { mutableStateOf(1.05f) }
+    var sttMode by remember { mutableStateOf("Push to Talk") }
     
     LaunchedEffect(selectedProvider) {
         showBaseUrlField = selectedProvider == "Custom"
@@ -145,9 +149,126 @@ fun SettingsScreen(
                 
                 SettingsToggleRow(
                     title = "Voice Assistant",
-                    subtitle = "Whisper STT — Coming in M2",
-                    enabled = false
+                    subtitle = "Push to Talk · VAD supported",
+                    enabled = voiceEnabled,
+                    onToggle = { voiceEnabled = !voiceEnabled }
                 )
+                
+                if (voiceEnabled) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    SettingsToggleRow(
+                        title = "Speak Results",
+                        subtitle = "Jarvis reads results aloud",
+                        enabled = speakResults,
+                        onToggle = { speakResults = !speakResults }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // STT Mode selector
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = VoidColor.Void900,
+                        border = BorderStroke(1.dp, VoidColor.BorderSubtle)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { 
+                                    sttMode = if (sttMode == "Push to Talk") "Auto (VAD)" else "Push to Talk"
+                                }
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "STT Mode",
+                                    style = TextStyle(
+                                        fontFamily = FontFamily.Default,
+                                        fontWeight = FontWeight(500),
+                                        fontSize = 14.sp,
+                                        color = VoidColor.TextPrimary
+                                    )
+                                )
+                                Text(
+                                    text = if (sttMode == "Push to Talk") 
+                                        "Hold mic to record, release to send" 
+                                    else 
+                                        "Tap to record, auto-sends on silence",
+                                    style = TextStyle(
+                                        fontFamily = FontFamily.Default,
+                                        fontWeight = FontWeight(400),
+                                        fontSize = 11.sp,
+                                        color = VoidColor.TextDisabled
+                                    )
+                                )
+                            }
+                            Text(
+                                text = sttMode,
+                                style = TextStyle(
+                                    fontFamily = FontFamily.Default,
+                                    fontWeight = FontWeight(500),
+                                    fontSize = 12.sp,
+                                    color = VoidColor.Violet
+                                )
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Model status
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = VoidColor.Void800,
+                        border = BorderStroke(1.dp, VoidColor.BorderSubtle)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = null,
+                                tint = VoidColor.Green,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Speech Recognition",
+                                    style = TextStyle(
+                                        fontFamily = FontFamily.Default,
+                                        fontWeight = FontWeight(500),
+                                        fontSize = 14.sp,
+                                        color = VoidColor.TextPrimary
+                                    )
+                                )
+                                Text(
+                                    text = "Google Speech · Online",
+                                    style = TextStyle(
+                                        fontFamily = FontFamily.Default,
+                                        fontWeight = FontWeight(400),
+                                        fontSize = 11.sp,
+                                        color = VoidColor.TextDisabled
+                                    )
+                                )
+                            }
+                            Text(
+                                text = "Ready",
+                                style = TextStyle(
+                                    fontFamily = FontFamily.Default,
+                                    fontWeight = FontWeight(500),
+                                    fontSize = 12.sp,
+                                    color = VoidColor.Green
+                                )
+                            )
+                        }
+                    }
+                }
                 
                 Spacer(modifier = Modifier.height(32.dp))
                 
@@ -521,12 +642,17 @@ sealed class TestState {
 private fun SettingsToggleRow(
     title: String,
     subtitle: String,
-    enabled: Boolean
+    enabled: Boolean,
+    onToggle: (() -> Unit)? = null
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(64.dp),
+            .height(64.dp)
+            .then(
+                if (onToggle != null) Modifier.clickable { onToggle() }
+                else Modifier
+            ),
         shape = RoundedCornerShape(16.dp),
         color = VoidColor.Void900,
         border = BorderStroke(1.dp, VoidColor.BorderSubtle)
@@ -569,8 +695,8 @@ private fun SettingsToggleRow(
             
             Switch(
                 checked = enabled,
-                onCheckedChange = { },
-                enabled = false,
+                onCheckedChange = { onToggle?.invoke() },
+                enabled = onToggle != null,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = VoidColor.TextPrimary,
                     checkedTrackColor = VoidColor.Violet,
