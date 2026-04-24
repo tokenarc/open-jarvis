@@ -10,5 +10,6 @@ data class TaskNode(
     val command: String,
     val result: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val providerUsed: String? = null
+    val providerUsed: String? = null,
+    val latencyMs: Long = 0L
 )

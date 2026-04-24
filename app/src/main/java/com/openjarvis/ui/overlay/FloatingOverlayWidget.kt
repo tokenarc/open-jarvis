@@ -234,9 +234,16 @@ private fun ExpandedOverlay(
     }
     
     LaunchedEffect(agentState) {
-        if (agentState is AgentState.Done) {
-            delay(2000)
-            onCollapse()
+        when (agentState) {
+            is AgentState.Done -> {
+                delay(2000)
+                onCollapse()
+            }
+            is AgentState.Error -> {
+                delay(4000)
+                onCollapse()
+            }
+            else -> {}
         }
     }
     
