@@ -7,6 +7,8 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.openjarvis.graphify.nodes.*
+import com.openjarvis.intelligence.AppIntelligenceEntity
+import com.openjarvis.intelligence.AppIntelligenceDao
 
 @Database(
     entities = [
@@ -15,9 +17,10 @@ import com.openjarvis.graphify.nodes.*
         ContactNode::class,
         PatternNode::class,
         ProviderNode::class,
-        EdgeEntity::class
+        EdgeEntity::class,
+        AppIntelligenceEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class GraphifyDB : RoomDatabase() {
@@ -27,66 +30,29 @@ abstract class GraphifyDB : RoomDatabase() {
     abstract fun patternNodeDao(): PatternNodeDao
     abstract fun providerNodeDao(): ProviderNodeDao
     abstract fun edgeDao(): EdgeDao
+    abstract fun appIntelligenceDao(): AppIntelligenceDao
     
     companion object {
         @Volatile
         private var INSTANCE: GraphifyDB? = null
         
-        val MIGRATION_1_2 = object : Migration(1, 2) {
+        val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS contact_nodes (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        name TEXT NOT NULL,
-                        phoneNumber TEXT,
-                        email TEXT,
-                        lastContacted INTEGER NOT NULL,
-                        contactCount INTEGER NOT NULL,
-                        contactMethod TEXT
+                    CREATE TABLE IF NOT EXISTS app_intelligence (
+                        packageName TEXT PRIMARY KEY NOT NULL,
+                        appName TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        capabilities TEXT NOT NULL,
+                        trustScore REAL NOT NULL DEFAULT 0.5,
+                        lastAnalyzed INTEGER NOT NULL,
+                        isAIApp INTEGER NOT NULL DEFAULT 0,
+                        aiMeta TEXT
                     )
                 """.trimIndent())
                 
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS pattern_nodes (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        sequenceHash TEXT NOT NULL,
-                        sequenceString TEXT NOT NULL,
-                        occurrenceCount INTEGER NOT NULL,
-                        lastSeen INTEGER NOT NULL,
-                        confidence REAL NOT NULL,
-                        timeOfDayMask INTEGER NOT NULL,
-                        dayOfWeekMask INTEGER NOT NULL
-                    )
-                """.trimIndent())
-                
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS provider_nodes (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        providerName TEXT NOT NULL,
-                        modelName TEXT,
-                        lastUsed INTEGER NOT NULL,
-                        useCount INTEGER NOT NULL,
-                        successCount INTEGER NOT NULL,
-                        totalLatencyMs INTEGER NOT NULL
-                    )
-                """.trimIndent())
-                
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS edge_entities (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        fromId INTEGER NOT NULL,
-                        fromType TEXT NOT NULL,
-                        toId INTEGER NOT NULL,
-                        toType TEXT NOT NULL,
-                        edgeType TEXT NOT NULL,
-                        weight REAL NOT NULL,
-                        lastUpdated INTEGER NOT NULL
-                    )
-                """.trimIndent())
-                
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_edge_from ON edge_entities(fromId, fromType)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_edge_to ON edge_entities(toId, toType)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_edge_type ON edge_entities(edgeType)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_app_intel_category ON app_intelligence(category)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_app_intel_ai ON app_intelligence(isAIApp)")
             }
         }
         
@@ -97,7 +63,7 @@ abstract class GraphifyDB : RoomDatabase() {
                     GraphifyDB::class.java,
                     "graphify.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance

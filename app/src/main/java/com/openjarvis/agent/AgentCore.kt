@@ -8,6 +8,11 @@ import com.openjarvis.accessibility.JarvisAccessibilityService
 import com.openjarvis.accessibility.ScreenReader
 import com.openjarvis.graphify.AnalysisEngine
 import com.openjarvis.graphify.GraphifyRepository
+import com.openjarvis.intelligence.AIAppInteractor
+import com.openjarvis.intelligence.AIApps
+import com.openjarvis.intelligence.AppAnalyzer
+import com.openjarvis.intelligence.TaskRouter
+import com.openjarvis.intelligence.TaskWorkingMemory
 import com.openjarvis.llm.UniversalAdapter
 import com.openjarvis.vision.VisionModule
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +29,10 @@ class AgentCore(private val context: Context) {
     private val universalAdapter = UniversalAdapter(context)
     private val screenReader = ScreenReader(context)
     private val visionModule = VisionModule.getInstance(context)
+    private val taskRouter = TaskRouter(context)
+    private val appAnalyzer = AppAnalyzer(context)
+    private val aiAppInteractor = AIAppInteractor(context)
+    private var workingMemory = TaskWorkingMemory()
     private val scope = CoroutineScope(Dispatchers.IO)
 
     private val _state = MutableStateFlow<AgentState>(AgentState.Idle)
@@ -49,8 +58,14 @@ press_recents → {"action":"press_recents"}
 wait_for     → {"action":"wait_for","text":"expected text","timeout_ms":3000}
 screenshot   → {"action":"screenshot"}
 read_screen  → {"action":"read_screen"}
+ai_prompt    → {"action":"ai_prompt","package":"com.openai.chatgpt","prompt":"{prompt}","outputKey":"result"}
+extract_text → {"action":"extract_text","outputKey":"page_text"}
 
 CURRENT SCREEN CONTENT: {SCREEN_OCR}
+
+APP SELECTION REASONING: {APP_REASONING}
+
+INSTALLED AI APPS: {AI_APPS}
 
 RECENT MEMORY CONTEXT: {GRAPHIFY_CONTEXT}
 
@@ -60,12 +75,19 @@ RULES:
 - If screen content is empty or unclear, add read_screen as first action
 - Never assume UI state — always verify with wait_for
 - Keep action arrays short: 2-8 steps per task
+- Use ai_prompt to delegate complex reasoning to installed AI apps
 - If a task is impossible to do safely, return: [{"action":"error","message":"reason"}]
 """.trimIndent()
 
     fun executeTask(command: String) {
+        workingMemory = TaskWorkingMemory()
+        
         scope.launch {
             try {
+                _state.value = AgentState.Running("analyzing task...")
+                
+                val plan = taskRouter.analyze(command)
+                
                 _state.value = AgentState.Running("reading screen...")
                 
                 val screenText = withContext(Dispatchers.IO) {
@@ -78,6 +100,8 @@ RULES:
                 
                 val fullSystem = systemPrompt
                     .replace("{SCREEN_OCR}", screenText.take(2000))
+                    .replace("{APP_REASONING}", plan.reasoning)
+                    .replace("{AI_APPS}", getInstalledAIApps())
                     .replace("{GRAPHIFY_CONTEXT}", if (memoryContext.isBlank()) "No recent tasks" else memoryContext)
                 
                 _state.value = AgentState.Running("thinking...")
@@ -147,6 +171,14 @@ RULES:
     }
     
     fun getStateFlow(): StateFlow<AgentState> = state
+    
+    private fun getInstalledAIApps(): String {
+        return AIApps.KNOWN_AI_APPS.keys.joinToString(", ")
+    }
+    
+    suspend fun getAnalyzedAppCount(): Int = appAnalyzer.getAnalyzedCount()
+    
+    suspend fun getAIAppCount(): Int = appAnalyzer.getAICount()
 
     private suspend fun executeActions(actions: List<Action>) {
         for ((index, action) in actions.withIndex()) {
@@ -184,6 +216,30 @@ RULES:
                 }
                 Action.PRESS_RECENTS -> {
                     JarvisAccessibilityService.instance?.pressRecents()
+                }
+                Action.AI_PROMPT -> {
+                    val packageName = action.packageName
+                    val prompt = workingMemory.interpolate(action.prompt ?: "")
+                    val outputKey = action.outputKey
+                    
+                    if (packageName != null) {
+                        val meta = AIApps.KNOWN_AI_APPS[packageName]
+                        if (meta != null) {
+                            aiAppInteractor.openAIApp(meta)
+                            kotlinx.coroutines.delay(2000)
+                            aiAppInteractor.typePrompt(prompt)
+                            kotlinx.coroutines.delay(1000)
+                            val response = aiAppInteractor.waitForResponse()
+                            if (outputKey != null) {
+                                workingMemory.set(outputKey, response)
+                            }
+                        }
+                    }
+                }
+                Action.EXTRACT_TEXT -> {
+                    val outputKey = action.outputKey ?: "page_text"
+                    val text = screenReader.extractAllText()
+                    workingMemory.set(outputKey, text)
                 }
                 Action.ERROR -> {
                     _state.value = AgentState.Error(action.message ?: "Task failed")

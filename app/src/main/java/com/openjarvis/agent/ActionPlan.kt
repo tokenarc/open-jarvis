@@ -15,7 +15,9 @@ data class Action(
     val y: Int? = null,
     val distance: String? = null,
     val timeoutMs: Long = 3000L,
-    val message: String? = null
+    val message: String? = null,
+    val prompt: String? = null,
+    val outputKey: String? = null
 ) {
     companion object {
         const val OPEN_APP = "open_app"
@@ -32,6 +34,8 @@ data class Action(
         const val WAIT_FOR = "wait_for"
         const val SCREENSHOT = "screenshot"
         const val READ_SCREEN = "read_screen"
+        const val AI_PROMPT = "ai_prompt"
+        const val EXTRACT_TEXT = "extract_text"
         const val ERROR = "error"
     }
 }
@@ -68,7 +72,9 @@ object ActionJsonParser {
                     y = if (obj.has("y")) obj.getInt("y") else null,
                     distance = obj.optString("distance", null).takeIf { it.isNotBlank() },
                     timeoutMs = obj.optLong("timeout_ms", 3000L),
-                    message = obj.optString("message", null).takeIf { it.isNotBlank() }
+                    message = obj.optString("message", null).takeIf { it.isNotBlank() },
+                    prompt = obj.optString("prompt", null).takeIf { it.isNotBlank() },
+                    outputKey = obj.optString("outputKey", null).takeIf { it.isNotBlank() }
                 )
             }
         } catch (e: Exception) {
