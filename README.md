@@ -34,10 +34,10 @@ Open Jarvis is an open-source Android AI agent that controls your device via voi
 | Termux CLI Bridge | ✅ Live | M5 |
 | App Intelligence + AI App Chaining | ✅ Live | M6-AI |
 | Local Model (offline) | ✅ Live | M6 |
-| Skills System | 📋 Planned | M6.5 |
-| MCP Server Support | 📋 Planned | M6.5 |
-| Screen Watch Mode | 📋 Planned | M6.5 |
-| Automation Scheduler | 📋 Planned | M6.5 |
+| Skills System | ✅ Live | M6.5 |
+| MCP Server Support | ✅ Live | M6.5 |
+| Screen Watch Mode | ✅ Live | M6.5 |
+| Automation Scheduler | ✅ Live | M6.5 |
 | App Builder Mode | 📋 Planned | M7 |
 | Optimization + Public Release | 📋 Planned | M8 |
 

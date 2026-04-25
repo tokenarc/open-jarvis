@@ -1,0 +1,31 @@
+{
+  "id": "set-alarm",
+  "name": "Set Alarm",
+  "version": "1.0",
+  "author": "tokenarc",
+  "triggerPhrases": [
+    "set alarm for *",
+    "wake me at *",
+    "alarm *"
+  ],
+  "variables": [
+    {
+      "key": "time",
+      "description": "Time for alarm (e.g., 7am, 8:30)",
+      "extractFrom": "trigger"
+    }
+  ],
+  "llmHint": "Open Clock app, set alarm for {time}",
+  "actionTemplate": [
+    {"action": "open_app", "package": "com.sec.android.app.clock"},
+    {"action": "tap", "text": "Alarm"},
+    {"action": "tap", "text": "Add alarm"},
+    {"action": "tap", "hint": "hour"},
+    {"action": "type", "value": "{time}"},
+    {"action": "tap", "text": "Done"}
+  ],
+  "successVerification": "Alarm created and shown",
+  "tags": ["utilities", "clock", "alarm"],
+  "usageCount": 0,
+  "successRate": 1.0
+}

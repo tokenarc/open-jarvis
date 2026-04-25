@@ -1,0 +1,30 @@
+{
+  "id": "open-youtube-search",
+  "name": "Search YouTube",
+  "version": "1.0",
+  "author": "tokenarc",
+  "triggerPhrases": [
+    "search youtube for *",
+    "play * on youtube",
+    "youtube *"
+  ],
+  "variables": [
+    {
+      "key": "query",
+      "description": "What to search for",
+      "extractFrom": "trigger"
+    }
+  ],
+  "llmHint": "Open YouTube, search for {query}, tap first result to play",
+  "actionTemplate": [
+    {"action": "open_app", "package": "com.google.android.youtube"},
+    {"action": "wait_for", "text": "Home", "timeout_ms": 4000},
+    {"action": "tap", "text": "Search"},
+    {"action": "type", "value": "{query}"},
+    {"action": "tap_first_result"}
+  ],
+  "successVerification": "Video starts playing",
+  "tags": ["entertainment", "youtube", "video"],
+  "usageCount": 0,
+  "successRate": 1.0
+}

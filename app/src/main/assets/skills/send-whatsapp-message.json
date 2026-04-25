@@ -1,0 +1,39 @@
+{
+  "id": "send-whatsapp-message",
+  "name": "Send WhatsApp Message",
+  "version": "1.0",
+  "author": "tokenarc",
+  "triggerPhrases": [
+    "text * on whatsapp",
+    "whatsapp * saying",
+    "send whatsapp to *",
+    "message * whatsapp"
+  ],
+  "variables": [
+    {
+      "key": "contact",
+      "description": "Name of the contact",
+      "extractFrom": "trigger"
+    },
+    {
+      "key": "message",
+      "description": "Message text to send",
+      "extractFrom": "trigger"
+    }
+  ],
+  "llmHint": "Open WhatsApp, search for {contact}, open chat, type {message} in message field, tap Send button",
+  "actionTemplate": [
+    {"action": "open_app", "package": "com.whatsapp"},
+    {"action": "wait_for", "text": "Chats", "timeout_ms": 4000},
+    {"action": "tap", "text": "Search"},
+    {"action": "type", "value": "{contact}"},
+    {"action": "tap_first_result"},
+    {"action": "tap", "hint": "message"},
+    {"action": "type", "value": "{message}"},
+    {"action": "tap", "text": "Send"}
+  ],
+  "successVerification": "Send button disappears OR message appears in chat",
+  "tags": ["messaging", "whatsapp", "communication"],
+  "usageCount": 0,
+  "successRate": 1.0
+}

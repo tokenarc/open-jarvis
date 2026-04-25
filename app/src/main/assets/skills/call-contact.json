@@ -1,0 +1,30 @@
+{
+  "id": "call-contact",
+  "name": "Call Contact",
+  "version": "1.0",
+  "author": "tokenarc",
+  "triggerPhrases": [
+    "call *",
+    "phone *",
+    "call * on phone"
+  ],
+  "variables": [
+    {
+      "key": "contact",
+      "description": "Name of the contact to call",
+      "extractFrom": "trigger"
+    }
+  ],
+  "llmHint": "Open Phone app, search for {contact}, tap call button",
+  "actionTemplate": [
+    {"action": "open_app", "package": "com.samsung.android.contacts"},
+    {"action": "tap", "text": "Keypad"},
+    {"action": "type", "value": "{contact}"},
+    {"action": "tap_first_result"},
+    {"action": "tap", "text": "Call"}
+  ],
+  "successVerification": "Call initiated",
+  "tags": ["communication", "calls", "phone"],
+  "usageCount": 0,
+  "successRate": 1.0
+}

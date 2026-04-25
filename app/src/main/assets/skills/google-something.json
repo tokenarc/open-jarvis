@@ -1,0 +1,29 @@
+{
+  "id": "google-something",
+  "name": "Google Search",
+  "version": "1.0",
+  "author": "tokenarc",
+  "triggerPhrases": [
+    "google *",
+    "search for *",
+    "look up *"
+  ],
+  "variables": [
+    {
+      "key": "query",
+      "description": "What to search for",
+      "extractFrom": "trigger"
+    }
+  ],
+  "llmHint": "Open Chrome/Google, search for {query}",
+  "actionTemplate": [
+    {"action": "open_app", "package": "com.android.chrome"},
+    {"action": "tap", "text": "Search"},
+    {"action": "type", "value": "{query}"},
+    {"action": "tap", "text": "Search"}
+  ],
+  "successVerification": "Search results displayed",
+  "tags": ["search", "browser", "google"],
+  "usageCount": 0,
+  "successRate": 1.0
+}

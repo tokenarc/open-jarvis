@@ -1,0 +1,28 @@
+{
+  "id": "send-sms",
+  "name": "Send SMS",
+  "version": "1.0",
+  "author": "tokenarc",
+  "triggerPhrases": [
+    "text *",
+    "sms *",
+    "send sms to *"
+  ],
+  "variables": [
+    {"key": "contact", "description": "Contact name", "extractFrom": "trigger"},
+    {"key": "message", "description": "Message to send", "extractFrom": "trigger"}
+  ],
+  "llmHint": "Open Messages, search for {contact}, type {message}, send",
+  "actionTemplate": [
+    {"action": "open_app", "package": "com.google.android.apps.messaging"},
+    {"action": "tap", "text": "Start chat"},
+    {"action": "type", "value": "{contact}"},
+    {"action": "tap_first_result"},
+    {"action": "type", "value": "{message}"},
+    {"action": "tap", "text": "Send"}
+  ],
+  "successVerification": "Message appears in thread",
+  "tags": ["messaging", "sms", "communication"],
+  "usageCount": 0,
+  "successRate": 1.0
+}

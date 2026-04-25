@@ -1,0 +1,21 @@
+{
+  "id": "take-screenshot",
+  "name": "Take Screenshot",
+  "version": "1.0",
+  "author": "tokenarc",
+  "triggerPhrases": [
+    "take a screenshot",
+    "screenshot",
+    "capture screen"
+  ],
+  "variables": [],
+  "llmHint": "Take a screenshot and save to gallery",
+  "actionTemplate": [
+    {"action": "press_power_and_volume_down"},
+    {"action": "wait_for", "text": "Screenshot", "timeout_ms": 1000}
+  ],
+  "successVerification": "Screenshot animation shown",
+  "tags": ["utilities", "screenshot", "capture"],
+  "usageCount": 0,
+  "successRate": 1.0
+}
