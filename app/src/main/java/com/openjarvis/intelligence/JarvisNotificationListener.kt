@@ -15,7 +15,37 @@ class JarvisNotificationListener : NotificationListenerService() {
     private var graphifyRepo: GraphifyRepository? = null
     private val notifications = mutableListOf<JarvisNotification>()
     
+    companion object {
+        private val PRIVACY_PROTECTED_APPS = setOf(
+            "com.google.android.apps.nbu.paisa.user",
+            "com.phonepe.app",
+            "net.one97.paytm",
+            "com.bankofamerica.cashpromobile",
+            "com.chase",
+            "com.wells Fargo",
+            "com.usbank",
+            "com.citi",
+            "com.barclays",
+            "com.hsbc",
+            "com.db",
+            "com.americanexpress",
+            "com.discover",
+            "com.paypal",
+            "com.squareup",
+            "com.stripe",
+            "com.razorpay"
+        )
+        
+        fun shouldProcessNotification(packageName: String): Boolean {
+            return packageName !in PRIVACY_PROTECTED_APPS
+        }
+    }
+    
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        if (!shouldProcessNotification(sbn.packageName)) {
+            return
+        }
+        
         val parsed = parseNotification(sbn)
         notifications.add(parsed)
         

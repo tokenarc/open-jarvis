@@ -1,6 +1,7 @@
 package com.openjarvis.bridge
 
 import android.content.Context
+import android.os.Build
 import com.openjarvis.agent.AgentCore
 import com.openjarvis.agent.AgentState
 import com.openjarvis.graphify.GraphifyRepository
@@ -22,9 +23,24 @@ class SocketServer(
     private var isRunning = false
     private var runningPort = 0
     
+    private var lastRequestTime = 0L
+    private var requestCount = 0
+    
     private val socketFile: java.io.File
         get() = java.io.File(context.filesDir, SOCKET_NAME)
-
+    
+    private val allowedUids = setOf(
+        context.applicationInfo.uid,
+        2000, 
+        "com.termux".hashCode()
+    )
+    
+    companion object {
+        private const val SOCKET_NAME = "jarvis.port"
+        private const val MAX_COMMAND_LENGTH = 2000
+        private const val MAX_REQUESTS_PER_SECOND = 10
+    }
+    
     fun start() {
         if (isRunning) return
         
