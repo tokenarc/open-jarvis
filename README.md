@@ -11,7 +11,9 @@
 
 ## What Is This
 
-Open Jarvis is an open-source Android AI agent that controls your device via voice or text commands. No root required. No subscriptions. Uses pluggable LLM providers. Learns your habits over time. Chains AI apps together for complex multi-step tasks. Lightweight enough to run on 4GB RAM devices.
+**Give Jarvis a prompt. It handles everything.**
+
+Open Jarvis is an autonomous Android AI agent that accepts natural language
 
 [![Android](https://img.shields.io/badge/Android-8.0%2B-brightgreen)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue)](https://kotlinlang.org)
@@ -38,6 +40,15 @@ Open Jarvis is an open-source Android AI agent that controls your device via voi
 | MCP Server Support | ✅ Live | M6.5 |
 | Screen Watch Mode | ✅ Live | M6.5 |
 | Automation Scheduler | ✅ Live | M6.5 |
+| Conversation Mode | ✅ Live | M6.8 |
+| Notification Intelligence | ✅ Live | M6.8 |
+| Tutorial Mode | ✅ Live | M6.8 |
+| Prompt Library | ✅ Live | M6.8 |
+| Risky Action Confirmation | ✅ Live | M6.8 |
+| Onboarding Flow | ✅ Live | M6.8 |
+| Clipboard Intelligence | ✅ Live | M6.8 |
+| Self-Healing Executor | ✅ Live | M6.8 |
+| Multi-Phase Prompt Engine | ✅ Live | M6.8 |
 | App Builder Mode | 📋 Planned | M7 |
 | Optimization + Public Release | 📋 Planned | M8 |
 
