@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.openjarvis.llm.providers.*
+import com.openjarvis.local.ModelManager
 
 class UniversalAdapter(private val context: Context) {
     
@@ -32,6 +33,11 @@ class UniversalAdapter(private val context: Context) {
             "Anthropic Claude" -> AnthropicProvider(apiKey, model)
             "OpenAI" -> OpenAIProvider(apiKey, model)
             "Ollama (Local)" -> OllamaProvider(baseUrl, model)
+            "Local (LlamaCpp)" -> {
+                val mm = getModelManager(context)
+                val tier = mm.getDownloadedTier() ?: ModelManager.ModelTier.MINIMUM
+                LlamaProvider(mm.getModelPath(tier), tier.displayName)
+            }
             "Custom" -> CustomProvider(baseUrl, apiKey, model)
             else -> CustomProvider(baseUrl, apiKey, model)
         }
@@ -57,6 +63,8 @@ class UniversalAdapter(private val context: Context) {
     fun getProviderName(): String = prefs.getString("provider_name", "Groq") ?: "Groq"
     
     companion object {
+        private var modelManager: ModelManager? = null
+        
         val AVAILABLE_PROVIDERS = listOf(
             "Groq",
             "Google Gemini",
@@ -64,8 +72,22 @@ class UniversalAdapter(private val context: Context) {
             "Anthropic Claude",
             "OpenAI",
             "Ollama (Local)",
-            "Custom"
+            "Local (LlamaCpp)"
         )
+        
+        fun getModelManager(context: Context): ModelManager {
+            return modelManager ?: synchronized(this) {
+                modelManager ?: ModelManager(context.applicationContext).also { modelManager = it }
+            }
+        }
+        
+        fun isLocalModelLoaded(): Boolean {
+            return modelManager?.state?.value is ModelManager.ModelState.ModelLoaded
+        }
+        
+        suspend fun loadLocalModel(tier: ModelManager.ModelTier): Result<Unit> {
+            return modelManager?.loadModel(tier) ?: Result.failure(Exception("ModelManager not initialized"))
+        }
         
         fun getDefaultModel(provider: String): String = when (provider) {
             "Groq" -> "llama-3.1-70b-versatile"

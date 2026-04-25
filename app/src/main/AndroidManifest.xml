@@ -58,6 +58,11 @@
                 android:value="ai_assistant_overlay" />
         </service>
 
+        <service
+            android:name=".local.DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
     </application>
 
 </manifest>
