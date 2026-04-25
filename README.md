@@ -49,8 +49,8 @@ Open Jarvis is an autonomous Android AI agent that accepts natural language
 | Clipboard Intelligence | ✅ Live | M6.8 |
 | Self-Healing Executor | ✅ Live | M6.8 |
 | Multi-Phase Prompt Engine | ✅ Live | M6.8 |
-| App Builder Mode | 📋 Planned | M7 |
-| Optimization + Public Release | 📋 Planned | M8 |
+| App Builder Mode | ✅ Live | M7 |
+| Optimization + Public Release | ✅ Live | M8 |
 
 ---
 
@@ -363,11 +363,11 @@ open-jarvis/
 | M4 | Graphify Memory | ✅ Complete | Pattern learning |
 | M5 | Termux CLI Bridge | ✅ Complete | TCP socket + jarvis.sh |
 | M6-AI | App Intelligence | ✅ Complete | Auto app selection |
-| M6 | Local Model Support | 🔨 Building | llama.cpp bridge |
-| M6.5 | Skills System | 📋 Planned | Skill files |
-| M6.5 | MCP Server | 📋 Planned | Model Context Protocol |
-| M7 | App Builder Mode | 📋 Planned | No-code agent creation |
-| M8 | Optimization + Release | 📋 Planned | Public launch |
+| M6 | Local Model Support | ✅ Complete | llama.cpp bridge |
+| M6.5 | Skills System | ✅ Complete | Skill files |
+| M6.5 | MCP Server | ✅ Complete | Model Context Protocol |
+| M7 | App Builder Mode | ✅ Complete | No-code agent creation |
+| M8 | Optimization + Release | ✅ Complete | Public launch |
 
 ---
 
@@ -394,6 +394,37 @@ Skills system coming in M6.5 — contribute skill files.
 | Local model loaded | ~2.1GB | 5-10 seconds |
 
 Tested on: Android 8.0+, 4GB RAM minimum recommended
+
+---
+
+## FAQ
+
+**Does it need root?**
+No. Open Jarvis uses Android Accessibility Service which requires no root access.
+
+**Does it work offline?**
+Yes. Download a local model (Phi-3 Mini or Gemma-2) in Settings. Voice also works offline. Zero cloud dependency.
+
+**Is my data private?**
+All data stays on your device. Graphify memory is local SQLite. API keys stored in Android EncryptedSharedPreferences. Network calls only go to your configured LLM provider.
+
+**Which LLM should I use?**
+Start with Groq — it's free, fast, and works great for device control tasks.
+
+**Can it control any app?**
+Any app that supports Android Accessibility Service — which is virtually all apps. Some games with custom rendering may have limited element detection.
+
+**Can I use it without any API key?**
+Yes — download a local model in Settings → Local Model. Phi-3 Mini (2.2GB) works on 4GB RAM devices.
+
+**How do I add Jarvis to Termux?**
+`cp scripts/jarvis.sh ~/bin/jarvis && chmod +x ~/bin/jarvis` Then: `jarvis "your command here"`
+
+**What is Tutorial Mode?**
+Say "show me how to..." and Jarvis guides you through the task step by step, highlighting each element before tapping it.
+
+**Can Jarvis build apps?**
+Yes — say "build me a [type] app" and Jarvis generates a complete Android project. Connect Termux with Gradle for auto-building APK.
 
 ---
 
