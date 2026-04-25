@@ -9,6 +9,7 @@ import com.openjarvis.accessibility.ScreenReader
 import com.openjarvis.graphify.AnalysisEngine
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.llm.UniversalAdapter
+import com.openjarvis.vision.VisionModule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +23,7 @@ class AgentCore(private val context: Context) {
     private val analysisEngine = AnalysisEngine(context)
     private val universalAdapter = UniversalAdapter(context)
     private val screenReader = ScreenReader(context)
+    private val visionModule = VisionModule.getInstance(context)
     private val scope = CoroutineScope(Dispatchers.IO)
 
     private val _state = MutableStateFlow<AgentState>(AgentState.Idle)
