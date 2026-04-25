@@ -1,9 +1,17 @@
 package com.openjarvis.graphify.nodes
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "task_nodes")
+@Entity(
+    tableName = "task_nodes",
+    indices = [
+        Index("timestamp"),
+        Index("providerUsed"),
+        Index("command")
+    ]
+)
 data class TaskNode(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

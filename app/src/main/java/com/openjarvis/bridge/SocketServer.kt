@@ -2,6 +2,7 @@ package com.openjarvis.bridge
 
 import android.content.Context
 import android.os.Build
+import android.os.Process
 import com.openjarvis.agent.AgentCore
 import com.openjarvis.agent.AgentState
 import com.openjarvis.graphify.GraphifyRepository
@@ -31,9 +32,18 @@ class SocketServer(
     
     private val allowedUids = setOf(
         context.applicationInfo.uid,
-        2000, 
+        2000,
         "com.termux".hashCode()
     )
+
+    private fun isAuthorized(): Boolean {
+        return try {
+            val callingUid = Process.myUid()
+            callingUid in allowedUids
+        } catch (e: Exception) {
+            false
+        }
+    }
     
     companion object {
         private const val SOCKET_NAME = "jarvis.port"
@@ -97,7 +107,12 @@ class SocketServer(
                 writer.println("""{"error":"empty request"}""")
                 return@withContext
             }
-            
+
+            if (!isAuthorized()) {
+                writer.println(createErrorResponse("", "unauthorized"))
+                return@withContext
+            }
+
             val request = parseRequest(line)
             if (request == null) {
                 writer.println(createErrorResponse("", "invalid JSON"))

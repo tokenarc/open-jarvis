@@ -23,7 +23,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.lifecycleScope
 import com.openjarvis.ui.theme.VoidColor
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class OnboardingActivity : ComponentActivity() {
     
@@ -357,8 +360,8 @@ private fun TryItScreen(onBack: () -> Unit, onSuccess: () -> Unit) {
         Button(
             onClick = {
                 isRunning = true
-                kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    kotlinx.coroutines.delay(2000)
+                lifecycleScope.launch {
+                    delay(2000)
                     isRunning = false
                     onSuccess()
                 }

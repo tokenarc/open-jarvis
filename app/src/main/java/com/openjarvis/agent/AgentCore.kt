@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class AgentCore(private val context: Context) {
 
@@ -34,13 +36,14 @@ class AgentCore(private val context: Context) {
     private val aiAppInteractor = AIAppInteractor(context)
     private var workingMemory = TaskWorkingMemory()
     private val scope = CoroutineScope(Dispatchers.IO)
+    private val taskMutex = Mutex()
 
     private val _state = MutableStateFlow<AgentState>(AgentState.Idle)
     val state: StateFlow<AgentState> = _state
 
     private val systemPrompt = """
 You are Open Jarvis — an Android device control AI agent.
-The user gives you a command in natural language.
+The user gives you a cleanCommand in natural language.
 You must respond with ONLY a valid JSON array of actions. No explanation. No markdown fences. No preamble. Pure JSON array only.
 
 AVAILABLE ACTIONS:
@@ -79,14 +82,33 @@ RULES:
 - If a task is impossible to do safely, return: [{"action":"error","message":"reason"}]
 """.trimIndent()
 
-    fun executeTask(command: String) {
+fun executeTask(cleanCommand: String) {
         workingMemory = TaskWorkingMemory()
         
         scope.launch {
-            try {
-                _state.value = AgentState.Running("analyzing task...")
+            taskMutex.withLock {
+                try {
+                    val sanitized = PromptSanitizer.sanitize(cleanCommand)
+                    when (sanitized) {
+                        is PromptSanitizer.SanitizeResult.Rejected -> {
+                            _state.value = AgentState.Error(sanitized.reason)
+                            return@taskMutex.withLock
+                        }
+                        is PromptSanitizer.SanitizeResult.Suspicious -> {
+                            _state.value = AgentState.Running("analyzing...")
+                        }
+                        is PromptSanitizer.SanitizeResult.Clean -> { }
+                    }
+                    
+                    val cleanCommand = when (sanitized) {
+                        is PromptSanitizer.SanitizeResult.Suspicious -> sanitized.sanitized
+                        is PromptSanitizer.SanitizeResult.Clean -> sanitized.text
+                        else -> cleanCommand
+                    }
+                    
+                    _state.value = AgentState.Running("analyzing task...")
                 
-                val plan = taskRouter.analyze(command)
+                val plan = taskRouter.analyze(cleanCommand)
                 
                 _state.value = AgentState.Running("reading screen...")
                 
@@ -96,7 +118,7 @@ RULES:
                 
                 _state.value = AgentState.Running("getting context...")
                 
-                val memoryContext = graphifyRepo.buildMemoryContext(command)
+                val memoryContext = graphifyRepo.buildMemoryContext(cleanCommand)
                 
                 val fullSystem = systemPrompt
                     .replace("{SCREEN_OCR}", screenText.take(2000))
@@ -108,23 +130,32 @@ RULES:
                 
                 val startTime = System.currentTimeMillis()
                 
-                val result = universalAdapter.complete(fullSystem, command)
+                val result = universalAdapter.complete(fullSystem, cleanCommand)
                 result.fold(
                     onSuccess = { rawJson ->
                         val latency = System.currentTimeMillis() - startTime
                         
-                        val actions = ActionJsonParser.parse(rawJson)
+                        val validation = LLMResponseValidator.validate(rawJson)
+                        val rawForParsing = if (!validation.isValid && validation.errors.isNotEmpty()) {
+                            _state.value = AgentState.Error("Invalid response: ${validation.errors.first()}")
+                            graphifyRepo.logTask(cleanCommand, "failed: validation error", "", 0)
+                            return@fold
+                        } else {
+                            rawJson
+                        }
+                        
+                        val actions = ActionJsonParser.parse(rawForParsing)
                             ?: run {
                                 val retry = universalAdapter.complete(
                                     fullSystem,
-                                    "$command\n\nRespond with JSON array ONLY. No other text."
+                                    "$cleanCommand\n\nRespond with JSON array ONLY. No other text."
                                 )
                                 retry.getOrNull()?.let { ActionJsonParser.parse(it) }
                             }
                         
                         if (actions == null) {
                             _state.value = AgentState.Error("Could not parse AI response")
-                            graphifyRepo.logTask(command, "failed: parse error", "", 0)
+                            graphifyRepo.logTask(cleanCommand, "failed: parse error", "", 0)
                             return@fold
                         }
                         
@@ -133,7 +164,7 @@ RULES:
                         executeActions(actions)
                         
                         graphifyRepo.logTask(
-                            command = command,
+                            cleanCommand = cleanCommand,
                             result = "success",
                             provider = universalAdapter.getProviderName(),
                             latencyMs = latency
@@ -152,12 +183,12 @@ RULES:
                             else -> error.message ?: "Unknown error"
                         }
                         _state.value = AgentState.Error(msg)
-                        graphifyRepo.logTask(command, "failed: $msg", "", 0)
+                        graphifyRepo.logTask(cleanCommand, "failed: $msg", "", 0)
                     }
                 )
             } catch (e: Exception) {
                 _state.value = AgentState.Error(e.message ?: "Unknown error")
-                graphifyRepo.logTask(command, "failed: ${e.message}", "", 0)
+                graphifyRepo.logTask(cleanCommand, "failed: ${e.message}", "", 0)
             }
         }
     }

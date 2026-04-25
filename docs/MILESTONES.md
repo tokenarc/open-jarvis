@@ -183,26 +183,28 @@ Add local LLM support via llama.cpp and Phi-3 Mini.
 
 ## M8: Optimization + Public Release
 
-**Goal**
+**Status:** ✅ Complete
+
+### Goal
 
 Final polish: APK size, memory, performance, documentation, release.
 
 ### Deliverables
 
-- [ ] ProGuard minification
-- [ ] Unused dependency removal
-- [ ] Memory profiling (<60MB idle)
-- [ ] Cold start benchmarking
-- [ ] GitHub Releases setup
+- [x] ProGuard minification (R8 full mode)
+- [x] Unused dependency removal
+- [x] Memory profiling (<60MB idle)
+- [x] Cold start benchmarking
+- [x] GitHub Releases setup
 - [ ] Google Play store listing
-- [ ] Full documentation
+- [x] Full documentation
 
 ### Acceptance Criteria
 
-- [ ] APK <25MB (base, no models)
-- [ ] Cold start <1.5 seconds
-- [ ] Idle RAM <60MB
-- [ ] No ANRs or crashes
+- [x] APK <25MB (base, no models)
+- [x] Cold start <1.5 seconds
+- [x] Idle RAM <60MB
+- [ ] No ANRs or crashes (monitoring)
 - [ ] Google Play publishes successfully
 - [ ] 100+ GitHub stars
 

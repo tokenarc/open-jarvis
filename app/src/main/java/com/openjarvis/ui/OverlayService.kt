@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class OverlayService : Service() {
 
@@ -38,6 +39,8 @@ class OverlayService : Service() {
     private lateinit var socketServer: SocketServer
     private var stateCollectJob: Job? = null
     private var recentTasks = emptyList<TaskNode>()
+    
+    private var isInitialized = false
 
     override fun onCreate() {
         super.onCreate()
@@ -49,11 +52,36 @@ class OverlayService : Service() {
         
         startForeground(NOTIFICATION_ID, createNotification())
         
+        CoroutineScope(Dispatchers.Main).launch {
+            delay(0)
+            initializeServices()
+        }
+        
         socketServer.start()
         
         // Load recent tasks
         CoroutineScope(Dispatchers.IO).launch {
             recentTasks = graphifyRepo.getRecentTasks(10)
+        }
+    }
+    
+    private suspend fun initializeServices() {
+        if (isInitialized) return
+        isInitialized = true
+        
+        // Heavy initializations deferred here
+        withContext(Dispatchers.IO) {
+            try {
+                graphifyRepo.getRecentTasks(10)
+            } catch (e: Exception) {
+                // Graphify initialization
+            }
+        }
+        
+        try {
+            voiceManager.initialize()
+        } catch (e: Exception) {
+            // Voice initialization
         }
     }
 
