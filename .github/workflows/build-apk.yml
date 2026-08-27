@@ -33,8 +33,409 @@ jobs:
         with:
           gradle-version: "8.2"
 
+      - name: Apply Open Jarvis source fixes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          print("Applying Open Jarvis build fixes...")
+
+          # ---------------------------------------------------------
+          # 1. gradle.properties - AndroidX
+          # ---------------------------------------------------------
+          gradle_props = Path("gradle.properties")
+          props = gradle_props.read_text() if gradle_props.exists() else ""
+
+          required_props = [
+              "android.useAndroidX=true",
+              "android.enableJetifier=true",
+              "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8",
+          ]
+
+          for line in required_props:
+              if line not in props:
+                  props += ("\n" if props and not props.endswith("\n") else "") + line + "\n"
+
+          gradle_props.write_text(props)
+
+          # ---------------------------------------------------------
+          # 2. Material Components dependency
+          # ---------------------------------------------------------
+          app_gradle = Path("app/build.gradle")
+          gradle_text = app_gradle.read_text()
+
+          material_dependency = "implementation 'com.google.android.material:material:1.11.0'"
+
+          if material_dependency not in gradle_text:
+              anchor = "implementation 'androidx.appcompat:appcompat:1.6.1'"
+              if anchor not in gradle_text:
+                  raise RuntimeError("AppCompat dependency anchor not found in app/build.gradle")
+
+              gradle_text = gradle_text.replace(
+                  anchor,
+                  anchor + "\n    " + material_dependency,
+                  1
+              )
+
+          app_gradle.write_text(gradle_text)
+
+          # ---------------------------------------------------------
+          # 3. Fix TaskNodeDao unused command parameter
+          # ---------------------------------------------------------
+          task_dao = Path(
+              "app/src/main/java/com/openjarvis/graphify/nodes/TaskNodeDao.kt"
+          )
+
+          text = task_dao.read_text()
+
+          old_query = '''@Query("SELECT * FROM task_nodes ORDER BY timestamp DESC LIMIT :limit")
+              suspend fun getTasksByCommand(command: String, limit: Int = 10): List<TaskNode>'''
+
+          new_query = '''@Query("SELECT * FROM task_nodes WHERE command = :command ORDER BY timestamp DESC LIMIT :limit")
+              suspend fun getTasksByCommand(command: String, limit: Int = 10): List<TaskNode>'''
+
+          if old_query in text:
+              text = text.replace(old_query, new_query, 1)
+          else:
+              text = text.replace(
+                  '@Query("SELECT * FROM task_nodes ORDER BY timestamp DESC LIMIT :limit")\n    suspend fun getTasksByCommand(command: String, limit: Int = 10): List<TaskNode>',
+                  '@Query("SELECT * FROM task_nodes WHERE command = :command ORDER BY timestamp DESC LIMIT :limit")\n    suspend fun getTasksByCommand(command: String, limit: Int = 10): List<TaskNode>',
+                  1
+              )
+
+          task_dao.write_text(text)
+
+          # ---------------------------------------------------------
+          # 4. Fix AgentCore braces and withLock return label
+          # ---------------------------------------------------------
+          agent_core = Path(
+              "app/src/main/java/com/openjarvis/agent/AgentCore.kt"
+          )
+
+          text = agent_core.read_text()
+
+          text = text.replace(
+              "return@taskMutex.withLock",
+              "return@withLock"
+          )
+
+          marker = "\n    suspend fun testConnection(): Result<Long> {"
+
+          if marker in text:
+              text = text.replace(
+                  marker,
+                  "\n    }\n\n    suspend fun testConnection(): Result<Long> {",
+                  1
+              )
+          else:
+              raise RuntimeError("AgentCore testConnection marker not found")
+
+          agent_core.write_text(text)
+
+          # ---------------------------------------------------------
+          # 5. Fix MCPClient RequestBody syntax
+          # ---------------------------------------------------------
+          mcp = Path(
+              "app/src/main/java/com/openjarvis/mcp/MCPClient.kt"
+          )
+
+          text = mcp.read_text()
+
+          if "import okhttp3.MediaType.Companion.toMediaType" not in text:
+              text = text.replace(
+                  "import okhttp3.Request\n",
+                  "import okhttp3.Request\n"
+                  "import okhttp3.MediaType.Companion.toMediaType\n"
+                  "import okhttp3.RequestBody.Companion.toRequestBody\n",
+                  1
+              )
+
+          bad_request = re.compile(
+              r'''\\.post\\(okhttp3\\.RequestBody\\.create\\(
+              \\s*"application/json"\\.toByteArray\\(\\)\\.to\\s+okhttp3\\.MediaType\\.get\\("application/json"\\),
+              \\s*requestBody
+              \\s*\\)\\)''',
+              re.VERBOSE
+          )
+
+          text, replaced = bad_request.subn(
+              '.post(requestBody.toRequestBody("application/json".toMediaType()))',
+              text
+          )
+
+          print(f"MCP RequestBody replacements: {replaced}")
+
+          if replaced == 0:
+              # Alternate exact-text fallback
+              bad_fragment = '''.post(okhttp3.RequestBody.create(
+                          "application/json".toByteArray().to okhttp3.MediaType.get("application/json"),
+                          requestBody
+                      ))'''
+
+              text = text.replace(
+                  bad_fragment,
+                  '.post(requestBody.toRequestBody("application/json".toMediaType()))'
+              )
+
+          mcp.write_text(text)
+
+          # ---------------------------------------------------------
+          # 6. Replace broken AutomationDB with correct Room mapping
+          # ---------------------------------------------------------
+          automation_db = Path(
+              "app/src/main/java/com/openjarvis/automation/AutomationDB.kt"
+          )
+
+          automation_db.write_text(r'''package com.openjarvis.automation
+
+          import android.content.Context
+          import androidx.room.Dao
+          import androidx.room.Database
+          import androidx.room.Entity
+          import androidx.room.Insert
+          import androidx.room.OnConflictStrategy
+          import androidx.room.PrimaryKey
+          import androidx.room.Query
+          import androidx.room.Room
+          import androidx.room.RoomDatabase
+          import androidx.room.Update
+          import androidx.work.CoroutineWorker
+          import androidx.work.WorkerParameters
+
+          @Entity(tableName = "automations")
+          data class AutomationEntity(
+              @PrimaryKey val id: String,
+              val name: String,
+              val command: String,
+              val scheduleType: String,
+              val scheduleHour: Int = 0,
+              val scheduleMinute: Int = 0,
+              val scheduleDayOfWeek: Int = 0,
+              val scheduleIntervalMs: Long = 0L,
+              val enabled: Boolean = true,
+              val lastRun: Long? = null,
+              val lastResult: String? = null,
+              val runCount: Int = 0
+          )
+
+          @Dao
+          abstract class AutomationDao {
+
+              @Query("SELECT * FROM automations ORDER BY name")
+              abstract suspend fun getAllEntities(): List<AutomationEntity>
+
+              @Query("SELECT * FROM automations WHERE id = :id")
+              abstract suspend fun getByIdEntity(id: String): AutomationEntity?
+
+              @Insert(onConflict = OnConflictStrategy.REPLACE)
+              abstract suspend fun insertEntity(automation: AutomationEntity)
+
+              @Update
+              abstract suspend fun updateEntity(automation: AutomationEntity)
+
+              @Query("DELETE FROM automations WHERE id = :id")
+              abstract suspend fun delete(id: String)
+
+              suspend fun getAll(): List<AutomationManager.Automation> {
+                  return getAllEntities().map { it.toAutomation() }
+              }
+
+              suspend fun getById(id: String): AutomationManager.Automation? {
+                  return getByIdEntity(id)?.toAutomation()
+              }
+
+              suspend fun insert(automation: AutomationManager.Automation) {
+                  insertEntity(automation.toEntity())
+              }
+
+              suspend fun update(automation: AutomationManager.Automation) {
+                  updateEntity(automation.toEntity())
+              }
+          }
+
+          private fun AutomationEntity.toAutomation(): AutomationManager.Automation {
+              val schedule = when (scheduleType) {
+
+                  "daily" -> AutomationManager.AutomationSchedule.Daily(
+                      hour = scheduleHour,
+                      minute = scheduleMinute
+                  )
+
+                  "weekly" -> AutomationManager.AutomationSchedule.Weekly(
+                      dayOfWeek = scheduleDayOfWeek,
+                      hour = scheduleHour,
+                      minute = scheduleMinute
+                  )
+
+                  "interval" -> AutomationManager.AutomationSchedule.Interval(
+                      intervalMs = scheduleIntervalMs
+                  )
+
+                  "once" -> AutomationManager.AutomationSchedule.Once(
+                      atMs = scheduleIntervalMs
+                  )
+
+                  else -> AutomationManager.AutomationSchedule.Interval(
+                      intervalMs = 60L * 60L * 1000L
+                  )
+              }
+
+              return AutomationManager.Automation(
+                  id = id,
+                  name = name,
+                  command = command,
+                  schedule = schedule,
+                  enabled = enabled,
+                  lastRun = lastRun,
+                  lastResult = lastResult,
+                  runCount = runCount
+              )
+          }
+
+          private fun AutomationManager.Automation.toEntity(): AutomationEntity {
+
+              return when (val currentSchedule = schedule) {
+
+                  is AutomationManager.AutomationSchedule.Daily -> {
+                      AutomationEntity(
+                          id = id,
+                          name = name,
+                          command = command,
+                          scheduleType = "daily",
+                          scheduleHour = currentSchedule.hour,
+                          scheduleMinute = currentSchedule.minute,
+                          enabled = enabled,
+                          lastRun = lastRun,
+                          lastResult = lastResult,
+                          runCount = runCount
+                      )
+                  }
+
+                  is AutomationManager.AutomationSchedule.Weekly -> {
+                      AutomationEntity(
+                          id = id,
+                          name = name,
+                          command = command,
+                          scheduleType = "weekly",
+                          scheduleHour = currentSchedule.hour,
+                          scheduleMinute = currentSchedule.minute,
+                          scheduleDayOfWeek = currentSchedule.dayOfWeek,
+                          enabled = enabled,
+                          lastRun = lastRun,
+                          lastResult = lastResult,
+                          runCount = runCount
+                      )
+                  }
+
+                  is AutomationManager.AutomationSchedule.Interval -> {
+                      AutomationEntity(
+                          id = id,
+                          name = name,
+                          command = command,
+                          scheduleType = "interval",
+                          scheduleIntervalMs = currentSchedule.intervalMs,
+                          enabled = enabled,
+                          lastRun = lastRun,
+                          lastResult = lastResult,
+                          runCount = runCount
+                      )
+                  }
+
+                  is AutomationManager.AutomationSchedule.Once -> {
+                      AutomationEntity(
+                          id = id,
+                          name = name,
+                          command = command,
+                          scheduleType = "once",
+                          scheduleIntervalMs = currentSchedule.atMs,
+                          enabled = enabled,
+                          lastRun = lastRun,
+                          lastResult = lastResult,
+                          runCount = runCount
+                      )
+                  }
+              }
+          }
+
+          @Database(
+              entities = [AutomationEntity::class],
+              version = 1,
+              exportSchema = false
+          )
+          abstract class AutomationDB : RoomDatabase() {
+
+              abstract fun automationDao(): AutomationDao
+
+              companion object {
+
+                  @Volatile
+                  private var INSTANCE: AutomationDB? = null
+
+                  fun getInstance(context: Context): AutomationDB {
+                      return INSTANCE ?: synchronized(this) {
+
+                          val instance = Room.databaseBuilder(
+                              context.applicationContext,
+                              AutomationDB::class.java,
+                              "automations.db"
+                          ).build()
+
+                          INSTANCE = instance
+                          instance
+                      }
+                  }
+              }
+          }
+
+          class AutomationWorker(
+              context: Context,
+              params: WorkerParameters
+          ) : CoroutineWorker(context, params) {
+
+              override suspend fun doWork(): Result {
+
+                  val id = inputData.getString("automation_id")
+                      ?: return Result.failure()
+
+                  inputData.getString("automation_command")
+                      ?: return Result.failure()
+
+                  return try {
+
+                      val db = AutomationDB.getInstance(applicationContext)
+                      val dao = db.automationDao()
+
+                      val automation = dao.getById(id)
+                          ?: return Result.failure()
+
+                      kotlinx.coroutines.delay(2000)
+
+                      val updated = automation.copy(
+                          lastRun = System.currentTimeMillis(),
+                          lastResult = "success",
+                          runCount = automation.runCount + 1
+                      )
+
+                      dao.update(updated)
+
+                      Result.success()
+
+                  } catch (e: Exception) {
+
+                      Result.failure()
+                  }
+              }
+          }
+          ''')
+
+          print("All current source fixes applied.")
+          PY
+
       - name: Build Debug APK
-        run: gradle --no-daemon :app:assembleDebug
+        run: |
+          gradle --no-daemon :app:assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -42,3 +443,4 @@ jobs:
           name: OpenJarvis-Samsung-SM-P587
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+          retention-days: 7
