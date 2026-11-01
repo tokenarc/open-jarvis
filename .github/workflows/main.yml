@@ -28,11 +28,9 @@ jobs:
           gradle-version: '8.2'
 
       - name: Setup Android SDK
-        run: |
-          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
-          yes | /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager --sdk_root=/usr/local/lib/android/sdk --licenses
-          /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager --sdk_root=/usr/local/lib/android/sdk "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
 
       - name: Build APK
         run: gradle assembleDebug --no-daemon
@@ -43,4 +41,3 @@ jobs:
           name: Open-Jarvis-Debug-APK
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-          
