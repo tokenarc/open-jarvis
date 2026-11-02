@@ -1,11 +1,14 @@
 package com.openjarvis.ui
 
+import android.Manifest
 import android.content.ComponentName
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
@@ -24,12 +27,26 @@ import com.openjarvis.ui.settings.SettingsScreen
 import com.openjarvis.ui.theme.OpenJarvisTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val requestMicPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        Toast.makeText(
+            this,
+            if (granted) "Microphone enabled" else "Microphone permission is required for voice input",
+            Toast.LENGTH_LONG
+        ).show()
+    }
     
     private lateinit var graphifyRepo: GraphifyRepository
     private lateinit var agentCore: AgentCore
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
         
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
