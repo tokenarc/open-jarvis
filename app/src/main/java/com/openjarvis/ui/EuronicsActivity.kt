@@ -2,6 +2,11 @@ package com.openjarvis.ui
 
 import android.annotation.SuppressLint
 import android.net.Uri
+import android.content.ContentValues
+import android.content.Context
+import android.os.Environment
+import android.provider.MediaStore
+import android.util.Base64
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
@@ -15,14 +20,48 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.ActivityResult
 import android.content.Intent
+import java.io.File
+import java.io.FileOutputStream
 
 class EuronicsActivity : ComponentActivity() {
+    companion object {
+        private const val DOWNLOAD_BRIDGE_SCRIPT = """
+            (function() {
+              if (window.__euronicsDownloadBridgeInstalled) return;
+              window.__euronicsDownloadBridgeInstalled = true;
+              document.addEventListener('click', function(event) {
+                var anchor = event.target && event.target.closest ? event.target.closest('a') : null;
+                if (!anchor || !anchor.href || !anchor.href.startsWith('blob:')) return;
+                event.preventDefault();
+                var name = anchor.getAttribute('download') || 'Euronics_Report';
+                fetch(anchor.href).then(function(response) { return response.blob(); }).then(function(blob) {
+                  var reader = new FileReader();
+                  reader.onloadend = function() {
+                    var data = String(reader.result || '').split(',')[1] || '';
+                    if (window.AndroidEuronics && data) AndroidEuronics.saveFile(name, blob.type || 'application/octet-stream', data);
+                  };
+                  reader.readAsDataURL(blob);
+                }).catch(function(error) { console.error('Euronics download failed', error); });
+              }, true);
+            })();
+        """
+    }
     private var pendingFileCallback: ValueCallback<Array<Uri>>? = null
     private lateinit var reportWebView: WebView
 
-    private val imagePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        pendingFileCallback?.onReceiveValue(if (uri == null) null else arrayOf(uri))
+    private val filePicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
+        val data = result.data
+        val uris = if (result.resultCode == RESULT_OK && data != null) {
+            val clip = data.clipData
+            when {
+                clip != null -> Array(clip.itemCount) { index -> clip.getItemAt(index).uri }
+                data.data != null -> arrayOf(data.data!!)
+                else -> null
+            }
+        } else null
+        pendingFileCallback?.onReceiveValue(uris)
         pendingFileCallback = null
     }
 
@@ -80,6 +119,7 @@ class EuronicsActivity : ComponentActivity() {
                 view?.evaluateJavascript("document.title") { title ->
                     Log.i("EuronicsWebView", "EURONICS_HTML_TITLE:$title")
                 }
+                view?.evaluateJavascript(DOWNLOAD_BRIDGE_SCRIPT, null)
             }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 if (request?.isForMainFrame == true) {
@@ -95,10 +135,20 @@ class EuronicsActivity : ComponentActivity() {
             ): Boolean {
                 pendingFileCallback?.onReceiveValue(null)
                 pendingFileCallback = filePathCallback
-                imagePicker.launch("image/*")
+                val accept = fileChooserParams?.acceptTypes
+                    ?.flatMap { it.split(",") }
+                    ?.map { it.trim() }
+                    ?.firstOrNull { it.isNotBlank() } ?: "*/*"
+                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = if (accept.startsWith("image/")) "image/*" else accept
+                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, fileChooserParams?.mode == FileChooserParams.MODE_OPEN_MULTIPLE)
+                }
+                filePicker.launch(Intent.createChooser(intent, "Choose Euronics file"))
                 return true
             }
         }
+        reportWebView.addJavascriptInterface(EuronicsDownloadBridge(this), "AndroidEuronics")
         reportWebView.setDownloadListener { url, _, contentDisposition, mimeType, _ ->
             try {
                 val request = android.app.DownloadManager.Request(Uri.parse(url))
@@ -123,6 +173,40 @@ class EuronicsActivity : ComponentActivity() {
                 if (reportWebView.canGoBack()) reportWebView.goBack() else finish()
             }
         })
+    }
+
+    private inner class EuronicsDownloadBridge(private val context: Context) {
+        @JavascriptInterface
+        fun saveFile(fileName: String, mimeType: String, base64Data: String) {
+            try {
+                val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(120)
+                    .ifBlank { "Euronics_Report" }
+                val bytes = Base64.decode(base64Data, Base64.DEFAULT)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
+                        put(MediaStore.MediaColumns.MIME_TYPE, mimeType.ifBlank { "application/octet-stream" })
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Euronics")
+                        put(MediaStore.MediaColumns.IS_PENDING, 1)
+                    }
+                    val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                        ?: throw IllegalStateException("Could not create Downloads file")
+                    contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                        ?: throw IllegalStateException("Could not write Downloads file")
+                    values.clear()
+                    values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                    contentResolver.update(uri, values, null, null)
+                } else {
+                    val dir = File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Euronics")
+                    if (!dir.exists()) dir.mkdirs()
+                    FileOutputStream(File(dir, safeName)).use { it.write(bytes) }
+                }
+                runOnUiThread { Toast.makeText(context, "Saved in Downloads/Euronics/$safeName", Toast.LENGTH_LONG).show() }
+            } catch (e: Exception) {
+                Log.e("EuronicsWebView", "Report download failed", e)
+                runOnUiThread { Toast.makeText(context, "Report download failed: ${e.message}", Toast.LENGTH_LONG).show() }
+            }
+        }
     }
 
     override fun onDestroy() {
