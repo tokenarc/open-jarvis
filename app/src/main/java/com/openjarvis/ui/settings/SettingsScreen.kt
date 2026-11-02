@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -41,6 +42,8 @@ fun SettingsScreen(
     onSaveProvider: (String, String, String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val voicePrefs = remember { context.getSharedPreferences("voice_prefs", android.content.Context.MODE_PRIVATE) }
     var selectedProvider by remember { mutableStateOf("Groq") }
     var baseUrl by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
@@ -50,8 +53,8 @@ fun SettingsScreen(
     var showPassword by remember { mutableStateOf(false) }
     var lastSaved by remember { mutableStateOf(0L) }
     var savedVisible by remember { mutableStateOf(false) }
-    var voiceEnabled by remember { mutableStateOf(false) }
-    var speakResults by remember { mutableStateOf(true) }
+    var voiceEnabled by remember { mutableStateOf(voicePrefs.getBoolean("voice_enabled", false)) }
+    var speakResults by remember { mutableStateOf(voicePrefs.getBoolean("speak_results", true)) }
     var speechRate by remember { mutableStateOf(1.05f) }
     var sttMode by remember { mutableStateOf("Push to Talk") }
     
@@ -153,7 +156,7 @@ fun SettingsScreen(
                     title = "Voice Assistant",
                     subtitle = "Push to Talk · VAD supported",
                     enabled = voiceEnabled,
-                    onToggle = { voiceEnabled = !voiceEnabled }
+                    onToggle = { voiceEnabled = !voiceEnabled; voicePrefs.edit().putBoolean("voice_enabled", voiceEnabled).apply() }
                 )
                 
                 if (voiceEnabled) {
@@ -163,7 +166,7 @@ fun SettingsScreen(
                         title = "Speak Results",
                         subtitle = "Jarvis reads results aloud",
                         enabled = speakResults,
-                        onToggle = { speakResults = !speakResults }
+                        onToggle = { speakResults = !speakResults; voicePrefs.edit().putBoolean("speak_results", speakResults).apply() }
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))
