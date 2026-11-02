@@ -5,6 +5,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.webkit.*
+import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewClientCompat
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -52,6 +54,9 @@ class EuronicsActivity : ComponentActivity() {
         root.addView(toolbar, LinearLayout.LayoutParams(-1, -2))
 
         reportWebView = WebView(this)
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
         reportWebView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -65,7 +70,10 @@ class EuronicsActivity : ComponentActivity() {
             displayZoomControls = false
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         }
-        reportWebView.webViewClient = object : WebViewClient() {
+        reportWebView.webViewClient = object : WebViewClientCompat() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                return assetLoader.shouldInterceptRequest(request.url)
+            }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 if (request?.isForMainFrame == true) {
                     Toast.makeText(this@EuronicsActivity, "Euronics page load error: ${error?.description}", Toast.LENGTH_LONG).show()
@@ -102,7 +110,7 @@ class EuronicsActivity : ComponentActivity() {
         root.addView(reportWebView, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
 
-        reportWebView.loadUrl("file:///android_asset/euronics/index.html")
+        reportWebView.loadUrl("https://appassets.androidplatform.net/assets/euronics/index.html")
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (reportWebView.canGoBack()) reportWebView.goBack() else finish()
