@@ -1,5 +1,11 @@
 package com.openjarvis.ui.dashboard
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.util.Base64
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -62,6 +68,28 @@ fun SelfRepairDashboardDialog(onDismiss: () -> Unit) {
                 }, modifier = Modifier.fillMaxWidth()) { Text("Analyze Latest Error + Generate Patch") }
                 if (busy) LinearProgressIndicator()
                 if (patchStatus.isNotBlank()) Text(patchStatus)
+                val hasPatch = patchStatus.contains("--- ") && patchStatus.contains("+++ ") && !patchStatus.contains("NO_SAFE_PATCH")
+                if (hasPatch) {
+                    OutlinedButton(
+                        onClick = {
+                            val payload = Base64.encodeToString(patchStatus.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Open Jarvis repair patch (base64)", payload))
+                            patchStatus = "Patch payload copied. Open the GitHub repair workflow and paste it into patch_b64."
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Copy GitHub Patch Payload") }
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://github.com/sandipsonawane73618-coder/open-jarvis/actions/workflows/jarvis-repair-branch.yml")
+                            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Open GitHub Repair Workflow") }
+                }
                 Divider()
                 Text("Repair History")
                 if (events.isEmpty()) Text("No errors recorded.")
