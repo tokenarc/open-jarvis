@@ -124,8 +124,8 @@ ${event.stackTrace.take(7000)}
                     check(response.isSuccessful) { "Ollama HTTP ${response.code}: ${raw.take(400)}" }
                     val rawProposal = JSONObject(raw).optJSONObject("message")?.optString("content").orEmpty().trim()
                     val proposal = rawProposal
-                        .replace(Regex("""^\`\`\`(?:diff)?\\s*"""), "")
-                        .replace(Regex("""\\s*\`\`\`$"""), "")
+                        .replace(Regex("^```(?:diff)?\\s*"), "")
+                        .replace(Regex("\\s*```$"), "")
                         .trim()
                     check(proposal.isNotBlank()) { "Ollama returned an empty patch proposal" }
                     val safe = if (proposal == "NO_SAFE_PATCH") proposal else {
