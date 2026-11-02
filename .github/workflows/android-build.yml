@@ -48,3 +48,17 @@ jobs:
           name: open-jarvis-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Android emulator launch smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb shell pm grant com.openjarvis android.permission.RECORD_AUDIO
+            adb shell am start -n com.openjarvis/.ui.MainActivity
+            sleep 8
+            adb shell pidof com.openjarvis
+            adb shell dumpsys activity activities | grep -q 'com.openjarvis/.ui.MainActivity'
