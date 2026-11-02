@@ -29,7 +29,7 @@ class SignedUpdateManager(private val context: Context) {
         if (!actual.equals(expectedSha256.trim(), ignoreCase = true)) {
             return Verification(false, "APK SHA-256 mismatch")
         }
-        val flags = if (Build.VERSION.SDK_INT >= 旗) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
         val info = context.packageManager.getPackageArchiveInfo(apk.absolutePath, flags)
             ?: return Verification(false, "APK package metadata is invalid")
         if (info.packageName != context.packageName) return Verification(false, "APK package name mismatch")
