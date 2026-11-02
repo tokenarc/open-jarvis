@@ -997,8 +997,7 @@ function petrolSyncFromJobRegister(dateHint){
      row={date:dt,details:'',parking:'',start:prev?(prev.end||''):'',end:'',total:'',food:'',local:'',less:'',remark:'',holiday:false};
      rows.push(row);changed=true;
    }
- });
- rows.forEach(r=>{
+ }); rows.forEach(r=>{
    const jobsFor=petrolJobsForDate(r.date).map(x=>String(x.job||'').trim()).filter(Boolean);
    if(!jobsFor.length)return;
    const auto=String(r._jobAuto||'');
@@ -1997,8 +1996,7 @@ html,body{width:100%!important;min-width:0!important;margin:0!important;overflow
       'Service in warranty':'SERVICE REPORT — IN WARRANTY',
       'Service Out of warranty':'SERVICE REPORT — OUT OF WARRANTY',
       'Service in AMC':'SERVICE REPORT — UNDER AMC',
-      'PPM Service Under AMC':'PPM SERVICE REPORT — UNDER AMC',
-      'Payment Collection Job':'PAYMENT COLLECTION REPORT',
+      'PPM Service Under AMC':'PPM SERVICE REPORT — UNDER AMC',      'Payment Collection Job':'PAYMENT COLLECTION REPORT',
       'Demo Sampling Job':'DEMO SAMPLING REPORT',
       'Samples Collection Job':'SAMPLES COLLECTION REPORT'
     };
