@@ -3,6 +3,7 @@ package com.openjarvis.agent
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -124,11 +125,8 @@ ${event.stackTrace.take(7000)}
                     val proposal = JSONObject(raw).optJSONObject("message")?.optString("content").orEmpty().trim()
                     check(proposal.isNotBlank()) { "Ollama returned an empty patch proposal" }
                     val safe = if (proposal == "NO_SAFE_PATCH") proposal else {
-                        check(proposal.contains("*** Begin Patch") || proposal.contains("--- ")) {
-                            "Ollama response is not a unified diff"
-                        }
-                        check(!proposal.contains("app/src/main/assets/euronics", ignoreCase = true)) {
-                            "Patch attempted to modify protected Euronics assets"
+                        check(RepairPatchPolicy.validateDiff(proposal)) {
+                            "Patch failed path allow-list or unified-diff validation"
                         }
                         proposal
                     }
