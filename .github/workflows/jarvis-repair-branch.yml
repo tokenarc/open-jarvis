@@ -72,13 +72,13 @@ jobs:
           if any(x in patch.lower() for x in ("euronics", "local.properties", "begin private key", ".github/workflows", "app/build.gradle")):
               raise SystemExit("Patch references a protected path or secret")
           allowed = ("app/src/main/java/com/openjarvis/", "app/src/test/java/com/openjarvis/")
-          headers = [line[4:].split("\\t", 1)[0] for line in patch.splitlines() if line.startswith(("--- ", "+++ "))]
+          headers = [line[4:].split(chr(9), 1)[0] for line in patch.splitlines() if line.startswith(("--- ", "+++ "))]
           paths = []
           for raw in headers:
               if raw == "/dev/null":
                   continue
               p = raw[2:] if raw.startswith(("a/", "b/")) else raw
-              if p.startswith("/") or "\\\\" in p or ".." in p.split("/") or not p.startswith(allowed):
+              if p.startswith("/") or chr(92) in p or ".." in p.split("/") or not p.startswith(allowed):
                   raise SystemExit("Patch path is outside Jarvis source/test allow-list: " + p)
               paths.append(p)
           if not paths:
