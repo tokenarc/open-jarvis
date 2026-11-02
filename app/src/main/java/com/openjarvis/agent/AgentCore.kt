@@ -58,7 +58,6 @@ press_home   → {"action":"press_home"}
 press_recents → {"action":"press_recents"}
 wait_for     → {"action":"wait_for","text":"expected text","timeout_ms":3000}
 read_screen  → {"action":"read_screen"}
-ai_prompt    → {"action":"ai_prompt","package":"com.openai.chatgpt","prompt":"{prompt}","outputKey":"result"}
 extract_text → {"action":"extract_text","outputKey":"page_text"}
 
 CURRENT SCREEN CONTENT: {SCREEN_OCR}
@@ -78,7 +77,7 @@ RULES:
 - If screen content is empty or unclear, add read_screen as first action
 - Never assume UI state — always verify with wait_for
 - Keep action arrays short: 2-8 steps per task
-- Use ai_prompt to delegate complex reasoning to installed AI apps
+- Use only the local Ollama model for all AI reasoning; never delegate to external AI apps
 - If a task is impossible to do safely, return: [{"action":"error","message":"reason"}]
 """.trimIndent()
 
@@ -246,7 +245,7 @@ RULES:
     fun getStateFlow(): StateFlow<AgentState> = state
 
     private fun getInstalledAIApps(): String {
-        return AIApps.KNOWN_AI_APPS.keys.joinToString(", ")
+        return "External AI apps disabled — use local Ollama only"
     }
 
     suspend fun getAnalyzedAppCount(): Int =
@@ -351,29 +350,10 @@ RULES:
                 }
 
                 Action.AI_PROMPT -> {
-                    val packageName = action.packageName
-                    val prompt =
-                        workingMemory.interpolate(action.prompt ?: "")
-                    val outputKey = action.outputKey
-
-                    if (packageName != null) {
-                        val meta = AIApps.KNOWN_AI_APPS[packageName]
-
-                        if (meta == null) {
-                            _state.value = AgentState.Error("Unsupported AI app: $packageName")
-                            return
-                        }
-                        aiAppInteractor.openAIApp(meta)
-                        kotlinx.coroutines.delay(2000)
-                        aiAppInteractor.typePrompt(prompt)
-                        kotlinx.coroutines.delay(1000)
-                        val response = aiAppInteractor.waitForResponse()
-                        if (response.isBlank()) {
-                            _state.value = AgentState.Error("AI app did not return a response")
-                            return
-                        }
-                        if (outputKey != null) workingMemory.set(outputKey, response)
-                    }
+                    _state.value = AgentState.Error(
+                        "External AI apps are disabled. Jarvis uses local Ollama only."
+                    )
+                    return
                 }
 
                 Action.EXTRACT_TEXT -> {
