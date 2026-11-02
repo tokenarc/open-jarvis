@@ -124,7 +124,7 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN")
             if (android.os.Build.VERSION.SDK_INT >= 34) {
                 putExtra("android.speech.extra.ENABLE_LANGUAGE_DETECTION", true)
-                putExtra(
+                putStringArrayListExtra(
                     "android.speech.extra.LANGUAGE_DETECTION_ALLOWED_LANGUAGES",
                     arrayListOf("hi-IN", "mr-IN", "en-IN")
                 )
