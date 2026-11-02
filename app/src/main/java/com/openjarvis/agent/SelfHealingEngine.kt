@@ -36,7 +36,7 @@ class SelfHealingEngine(context: Context) {
         val commandKey = digest(command.trim().lowercase())
         val prefix = "retry_${commandKey}_"
         val editor = prefs.edit()
-        prefs.all.keys.filter { it.startsWith(prefix) }.forEach(editor::remove)
+        prefs.all.keys.filter { it.startsWith(prefix) }.forEach { editor.remove(it) }
         editor.putString(KEY_LAST_SUCCESS, System.currentTimeMillis().toString()).apply()
     }
 
