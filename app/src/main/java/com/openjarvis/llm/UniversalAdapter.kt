@@ -21,10 +21,10 @@ class UniversalAdapter(private val context: Context) {
     )
     
     fun getActiveProvider(): LLMProvider {
-        val name = prefs.getString("provider_name", "Groq")
-        val baseUrl = prefs.getString("provider_base_url", "")
-        val apiKey = prefs.getString("provider_api_key", "")
-        val model = prefs.getString("provider_model", "")
+        val name = prefs.getString("provider_name", "Groq") ?: "Groq"
+        val baseUrl = prefs.getString("provider_base_url", "") ?: ""
+        val apiKey = prefs.getString("provider_api_key", "") ?: ""
+        val model = prefs.getString("provider_model", "") ?: ""
         
         return when (name) {
             "Groq" -> GroqProvider(apiKey, model)
