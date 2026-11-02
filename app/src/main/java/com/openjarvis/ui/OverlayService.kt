@@ -65,7 +65,8 @@ class OverlayService : Service() {
                 when (state) {
                     is VoiceManager.VoiceState.Result -> {
                         commandInput?.setText(state.text)
-                        statusText?.text = "Voice captured — tap Send"
+                        statusText?.text = "Voice captured — executing command…"
+                        submitCommand(state.text)
                     }
                     is VoiceManager.VoiceState.Error -> statusText?.text = state.message
                     is VoiceManager.VoiceState.Recording -> statusText?.text = "Listening… speak now"
@@ -79,8 +80,14 @@ class OverlayService : Service() {
                 when (state) {
                     is com.openjarvis.agent.AgentState.Idle -> statusText?.text = "Ready — type a command or use mic"
                     is com.openjarvis.agent.AgentState.Running -> statusText?.text = state.step
-                    is com.openjarvis.agent.AgentState.Done -> statusText?.text = state.result
-                    is com.openjarvis.agent.AgentState.Error -> statusText?.text = "Jarvis error: ${state.message}"
+                    is com.openjarvis.agent.AgentState.Done -> {
+                        statusText?.text = state.result
+                        voiceManager.speak("काम पूरा हुआ")
+                    }
+                    is com.openjarvis.agent.AgentState.Error -> {
+                        statusText?.text = "Jarvis error: ${state.message}"
+                        voiceManager.speak("कमांड पूरी नहीं हुई। ${state.message}")
+                    }
                 }
             }
         }
@@ -208,8 +215,9 @@ class OverlayService : Service() {
         if (isExpanded) commandInput?.requestFocus()
     }
 
-    private fun submitCommand() {
-        val command = commandInput?.text?.toString()?.trim().orEmpty()
+    private fun submitCommand(voiceCommand: String? = null) {
+        val command = voiceCommand?.trim().takeUnless { it.isNullOrBlank() }
+            ?: commandInput?.text?.toString()?.trim().orEmpty()
         if (command.isBlank()) {
             statusText?.text = "Type a command first"
             return
