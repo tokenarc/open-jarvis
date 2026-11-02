@@ -157,6 +157,23 @@ ${event.stackTrace.take(7000)}
         }
     }
 
+    suspend fun pullConfiguredModel(): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val baseUrl = (provider.getString("provider_base_url", "http://127.0.0.1:11434")
+                ?: "http://127.0.0.1:11434").trimEnd('/')
+            val model = provider.getString("provider_model", "qwen2.5:1.5b")
+                ?.takeIf { it.isNotBlank() } ?: "qwen2.5:1.5b"
+            val body = JSONObject().put("name", model).put("stream", false).toString()
+            val request = Request.Builder().url("$baseUrl/api/pull")
+                .post(body.toRequestBody("application/json".toMediaType())).build()
+            http.newCall(request).execute().use { response ->
+                val raw = response.body?.string().orEmpty()
+                check(response.isSuccessful) { "Ollama pull failed HTTP ${response.code}: ${raw.take(300)}" }
+                "Ollama model pull completed for $model. Run Check Ollama to verify."
+            }
+        }
+    }
+
     fun dashboardSummary(): String {
         val all = events()
         val failed = all.size
