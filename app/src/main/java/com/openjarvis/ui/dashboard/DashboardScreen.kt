@@ -339,7 +339,7 @@ private fun StatCard(count: Int, label: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun RecentTasksSection(tasks: List<TaskNode>, alpha: Float) {
-    Column(alpha = alpha) {
+    Column(modifier = Modifier.alpha(alpha)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
