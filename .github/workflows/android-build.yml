@@ -2,12 +2,23 @@ name: Android Build
 
 on:
   push:
-    branches: [main, feature/euronics-webview-integration, feature/self-healing-command-dictionary]
+    branches:
+      - main
+      - feature/euronics-webview-integration
+      - feature/self-healing-command-dictionary
+      - feature/autonomous-self-healing-edition
     paths:
       - "app/**"
       - "*.gradle"
       - "settings.gradle"
-      - ".github/workflows/android-build.yml"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "*.gradle"
+      - "settings.gradle"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
@@ -18,9 +29,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  assemble-debug:
+  test-build-smoke:
+    name: Unit tests, APK build and Android smoke test
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,15 +56,14 @@ jobs:
         with:
           gradle-version: "8.2"
 
+      - name: Run unit and regression tests
+        run: gradle --no-daemon :app:testDebugUnitTest
+
       - name: Compile debug APK
         run: gradle --no-daemon :app:assembleDebug
 
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: open-jarvis-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+      - name: Verify APK exists and is non-empty
+        run: test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Android emulator launch smoke test
         uses: reactivecircus/android-emulator-runner@v2
@@ -75,3 +86,11 @@ jobs:
             adb shell pidof com.openjarvis >/dev/null || { adb logcat -d -t 1500; exit 1; }
             adb shell dumpsys activity activities | grep -F 'com.openjarvis/.ui.MainActivity'
             adb logcat -d -t 1500 | grep -E 'FATAL EXCEPTION|AndroidRuntime' && exit 1 || true
+
+      - name: Upload tested debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-jarvis-autonomous-self-healing-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
