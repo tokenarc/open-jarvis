@@ -26,8 +26,8 @@ class AnalysisEngineTest {
     @Test
     fun levenshteinDistanceHandlesExactAndFuzzyNames() {
         assertEquals(0, AnalysisAlgorithms.levenshteinDistance("john", "john"))
-        assertEquals(1, AnalysisAlgorithms.levenshteinDistance("john", "jhon"))
-        assertEquals(2, AnalysisAlgorithms.levenshteinDistance("john", "jon"))
+        assertEquals(2, AnalysisAlgorithms.levenshteinDistance("john", "jhon"))
+        assertEquals(1, AnalysisAlgorithms.levenshteinDistance("john", "jon"))
     }
 
     @Test
