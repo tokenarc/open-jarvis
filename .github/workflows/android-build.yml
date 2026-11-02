@@ -14,12 +14,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-build-${{ github.sha }}
+  group: android-build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   assemble-debug:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,14 +60,17 @@ jobs:
           api-level: 34
           arch: x86_64
           profile: pixel_2
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: true
           script: |
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            timeout 90s adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell pm grant com.openjarvis android.permission.RECORD_AUDIO
             adb shell settings put secure enabled_accessibility_services com.openjarvis/com.openjarvis.accessibility.JarvisAccessibilityService
             adb shell settings put secure accessibility_enabled 1
             adb shell appops set com.openjarvis SYSTEM_ALERT_WINDOW allow
-            adb shell am start -W -n com.openjarvis/.ui.MainActivity
-            sleep 8
+            timeout 30s adb shell am start -W -n com.openjarvis/.ui.MainActivity
+            sleep 5
             adb shell dumpsys accessibility | grep -F 'JarvisAccessibilityService'
             adb shell pidof com.openjarvis >/dev/null || { adb logcat -d -t 1500; exit 1; }
             adb shell dumpsys activity activities | grep -F 'com.openjarvis/.ui.MainActivity'
