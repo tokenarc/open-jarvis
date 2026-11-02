@@ -128,7 +128,7 @@ class OverlayService : Service() {
                 textSize = 14f
                 setTextColor(Color.WHITE)
                 setHintTextColor(Color.GRAY)
-                singleLine = false
+                setSingleLine(false)
                 minLines = 2
                 maxLines = 4
                 inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
@@ -211,7 +211,7 @@ class OverlayService : Service() {
             delay(500)
             when (val state = agentCore.state.value) {
                 is com.openjarvis.agent.AgentState.Error -> statusText?.text = state.message
-                is com.openjarvis.agent.AgentState.Done -> statusText?.text = state.message
+                is com.openjarvis.agent.AgentState.Done -> statusText?.text = state.result
                 else -> statusText?.text = "Command sent — processing"
             }
         }
