@@ -38,6 +38,7 @@ class AgentCore(private val context: Context) {
     private val aiAppInteractor = AIAppInteractor(context)
     private val repairMemory = RepairMemory(context)
     private val selfHealing = SelfHealingEngine(context)
+    private val repairCenter = RepairCenter(context)
 
     private var workingMemory = TaskWorkingMemory()
 
@@ -199,6 +200,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                                 val diagnosis = ErrorDiagnosis.invalidPlan(reason)
                                 val detail = "raw=" + responseForDiagnostics.take(240).replace("\n", " ")
                                 repairMemory.recordFailure(diagnosis.code, diagnosis.stage)
+                                repairCenter.recordFailure(diagnosis.code, diagnosis.stage, detail, responseForDiagnostics.take(3500))
                                 _state.value = AgentState.Error(diagnosis.display(detail))
                                 graphifyRepo.logTask(safeCommand, "failed: ${diagnosis.display(detail)}", universalAdapter.getProviderName(), latency)
                                 return@fold
@@ -220,6 +222,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                                     "Action execution"
                                 )
                                 repairMemory.recordFailure(diagnosis.code, diagnosis.stage)
+                                repairCenter.recordFailure(diagnosis.code, diagnosis.stage, executionState.message)
                                 _state.value = AgentState.Error(diagnosis.display(executionState.message))
                                 graphifyRepo.logTask(safeCommand, "failed: ${diagnosis.display(executionState.message)}", universalAdapter.getProviderName(), latency)
                                 return@fold
@@ -251,6 +254,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                             val diagnosis = ErrorDiagnosis.fromThrowable(error, "Ollama request")
                             val msg = diagnosis.display(detail)
                             repairMemory.recordFailure(diagnosis.code, diagnosis.stage)
+                            repairCenter.recordFailure(error, "Ollama request")
                             _state.value = AgentState.Error(msg)
 
                             graphifyRepo.logTask(
@@ -272,6 +276,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                     val detail = "NullPointerException at $currentStage; ${e.message ?: "message unavailable"}; trace=$frames"
                     Log.e("JarvisAgent", detail, e)
                     repairMemory.recordFailure("JARVIS-NPE-001", currentStage)
+                    repairCenter.recordFailure(e, currentStage)
                     _state.value = AgentState.Error("Self-repair diagnosis [$detail]")
                     graphifyRepo.logTask(cleanCommand, "failed: $detail", universalAdapter.getProviderName(), 0)
 
@@ -289,6 +294,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                     val detail = "${e.javaClass.simpleName}: ${e.message ?: e.cause?.message ?: e.javaClass.name}"
                     val diagnosis = ErrorDiagnosis.fromThrowable(e, currentStage)
                     repairMemory.recordFailure(diagnosis.code, currentStage)
+                    repairCenter.recordFailure(e, currentStage)
                     _state.value = AgentState.Error(diagnosis.display(detail))
 
                     graphifyRepo.logTask(
