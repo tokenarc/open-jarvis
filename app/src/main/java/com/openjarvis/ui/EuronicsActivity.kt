@@ -121,10 +121,9 @@ class EuronicsActivity : ComponentActivity() {
                 }
                 view?.evaluateJavascript(DOWNLOAD_BRIDGE_SCRIPT, null)
             }
-            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                if (request?.isForMainFrame == true) {
-                    Toast.makeText(this@EuronicsActivity, "Euronics page load error: ${error?.description}", Toast.LENGTH_LONG).show()
-                }
+            @Suppress("DEPRECATION")
+            override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
+                Toast.makeText(this@EuronicsActivity, "Euronics page load error: ${description ?: errorCode}", Toast.LENGTH_LONG).show()
             }
         }
         reportWebView.webChromeClient = object : WebChromeClient() {
