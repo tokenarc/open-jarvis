@@ -40,7 +40,7 @@ class ScreenReader private constructor(
     }
 
     fun findNodeByText(text: String): AccessibilityNodeInfo? {
-        val rootNode = service.rootInActiveWindow ?: return null
+        val rootNode = serviceProvider()?.rootInActiveWindow ?: return null
         val result = findNodeRecursive(rootNode, text)
         rootNode.recycle()
         return result
@@ -74,7 +74,7 @@ class ScreenReader private constructor(
     }
 
     fun findNodeByHint(hint: String): AccessibilityNodeInfo? {
-        val rootNode = service.rootInActiveWindow ?: return null
+        val rootNode = serviceProvider()?.rootInActiveWindow ?: return null
         val result = findHintRecursive(rootNode, hint)
         rootNode.recycle()
         return result
@@ -106,7 +106,7 @@ class ScreenReader private constructor(
     }
 
     fun getFocusedNode(): AccessibilityNodeInfo? {
-        val rootNode = service.rootInActiveWindow ?: return null
+        val rootNode = serviceProvider()?.rootInActiveWindow ?: return null
         val focused = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
         rootNode.recycle()
         return focused
