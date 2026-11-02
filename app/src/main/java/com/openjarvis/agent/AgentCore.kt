@@ -150,7 +150,7 @@ RULES:
                                 "No recent tasks"
                             } else {
                                 memoryContext
-                            } + "\\n" + repairMemory.summary()
+                            } + "\\n" + repairMemory.summary() + "\\n" + selfHealing.summary()
                         )
 
                     _state.value = AgentState.Running("thinking...")
@@ -242,6 +242,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                             analysisEngine.analyzeLastTask()
 
                             nullRepairAttempts.remove(cleanCommand.trim().lowercase())
+                            selfHealing.recordSuccess(safeCommand)
                             repairMemory.recordRecovery("TASK-EXECUTION")
                             _state.value =
                                 AgentState.Done("done in ${latency}ms")
