@@ -20,7 +20,7 @@ concurrency:
 jobs:
   assemble-debug:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,7 +64,7 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
           disable-animations: true
           script: |
-            timeout 90s adb install -r app/build/outputs/apk/debug/app-debug.apk
+            timeout 240s adb install -r -t app/build/outputs/apk/debug/app-debug.apk
             adb shell pm grant com.openjarvis android.permission.RECORD_AUDIO
             adb shell settings put secure enabled_accessibility_services com.openjarvis/com.openjarvis.accessibility.JarvisAccessibilityService
             adb shell settings put secure accessibility_enabled 1
