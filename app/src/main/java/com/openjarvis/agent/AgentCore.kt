@@ -154,9 +154,6 @@ RULES:
 
                     result.fold(
                         onSuccess = { rawJson ->
-                            val latency =
-                                System.currentTimeMillis() - startTime
-
                             var validation =
                                 LLMResponseValidator.validate(rawJson)
                             var responseForDiagnostics = rawJson
