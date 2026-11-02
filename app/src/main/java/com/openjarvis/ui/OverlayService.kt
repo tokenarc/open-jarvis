@@ -8,6 +8,11 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.os.Build
+import android.view.View
+import android.widget.TextView
 import android.os.IBinder
 import android.view.Gravity
 import android.view.WindowManager
@@ -32,6 +37,7 @@ import kotlinx.coroutines.withContext
 class OverlayService : Service() {
 
     private var windowManager: WindowManager? = null
+    private var overlayView: View? = null
     
     private lateinit var agentCore: AgentCore
     private lateinit var voiceManager: VoiceManager
@@ -51,6 +57,7 @@ class OverlayService : Service() {
         socketServer = SocketServer(this, agentCore, graphifyRepo)
         
         startForeground(NOTIFICATION_ID, createNotification())
+        attachFloatingPill()
         
         CoroutineScope(Dispatchers.Main).launch {
             delay(0)
@@ -89,8 +96,58 @@ class OverlayService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         stateCollectJob?.cancel()
+        try { overlayView?.let { windowManager?.removeView(it) } } catch (_: Exception) { }
+        overlayView = null
         socketServer.stop()
         voiceManager.release()
+    }
+
+    private fun attachFloatingPill() {
+        if (!android.provider.Settings.canDrawOverlays(this) || overlayView != null) return
+        try {
+            windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+            val pill = TextView(this).apply {
+                text = "●  JARVIS"
+                textSize = 13f
+                setTextColor(Color.WHITE)
+                setPadding(24, 14, 24, 14)
+                background = GradientDrawable().apply {
+                    setColor(Color.rgb(35, 25, 65))
+                    cornerRadius = 48f
+                    setStroke(2, Color.rgb(145, 90, 255))
+                }
+                elevation = 12f
+                contentDescription = "Open Jarvis assistant"
+                setOnClickListener {
+                    val launch = Intent(this@OverlayService, MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    }
+                    startActivity(launch)
+                }
+            }
+            val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                overlayType,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.END
+                x = 20
+                y = 220
+            }
+            windowManager?.addView(pill, params)
+            overlayView = pill
+        } catch (e: Exception) {
+            android.util.Log.e("OpenJarvis", "Unable to attach floating pill", e)
+        }
     }
 
     private fun createNotification(): Notification {
