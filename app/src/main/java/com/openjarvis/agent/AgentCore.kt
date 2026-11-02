@@ -88,7 +88,8 @@ RULES:
         scope.launch {
             taskMutex.withLock {
                 try {
-                    val sanitized = PromptSanitizer.sanitize(cleanCommand)
+                    val normalizedCommand = CommandDictionary.normalize(cleanCommand)
+                    val sanitized = PromptSanitizer.sanitize(normalizedCommand)
 
                     when (sanitized) {
                         is PromptSanitizer.SanitizeResult.Rejected -> {
@@ -156,13 +157,41 @@ RULES:
                             val latency =
                                 System.currentTimeMillis() - startTime
 
-                            val validation =
+                            var validation =
                                 LLMResponseValidator.validate(rawJson)
+                            var responseForDiagnostics = rawJson
 
+                            // One bounded repair pass for malformed/empty model output. No device
+                            // action is executed until a complete plan passes validation.
+                            if (!validation.isValid) {
+                                val firstReason = validation.errors.firstOrNull() ?: "Empty action plan"
+                                _state.value = AgentState.Running("repairing AI action plan...")
+                                val repairSystem = """
+You repair Open Jarvis Android action plans.
+Return ONLY a non-empty JSON array of action objects. Every item must be an object with an "action" string.
+Allowed actions: open_app, tap, type, press_back, press_home, press_recents, wait_for, read_screen, extract_text, error.
+Fields: package, label, text, value, timeout_ms, message, outputKey.
+Do not add explanations, markdown, strings, nulls, or unsupported actions.
+Preserve the user's original intent. Never invent a destructive or sensitive action.
+""".trimIndent()
+                                val repairResult = universalAdapter.complete(
+                                    repairSystem,
+                                    "Original command: $safeCommand\\nValidation error: $firstReason\\nInvalid response: ${rawJson.take(3500)}"
+                                )
+                                val repairedResponse = repairResult.getOrNull()
+                                if (!repairedResponse.isNullOrBlank()) {
+                                    responseForDiagnostics = repairedResponse
+                                    validation = LLMResponseValidator.validate(repairedResponse)
+                                }
+                            }
+
+                            val latency = System.currentTimeMillis() - startTime
                             if (!validation.isValid) {
                                 val reason = validation.errors.firstOrNull() ?: "Empty action plan"
-                                _state.value = AgentState.Error("Invalid AI action plan: $reason")
-                                graphifyRepo.logTask(safeCommand, "failed: validation error", universalAdapter.getProviderName(), latency)
+                                val diagnosis = ErrorDiagnosis.invalidPlan(reason)
+                                val detail = "raw=${responseForDiagnostics.take(240).replace('\\n', ' ')}"
+                                _state.value = AgentState.Error(diagnosis.display(detail))
+                                graphifyRepo.logTask(safeCommand, "failed: ${diagnosis.display(detail)}", universalAdapter.getProviderName(), latency)
                                 return@fold
                             }
 
@@ -173,8 +202,14 @@ RULES:
                             )
 
                             executeActions(actions)
-                            if (_state.value is AgentState.Error) {
-                                graphifyRepo.logTask(safeCommand, "failed: action execution", universalAdapter.getProviderName(), latency)
+                            val executionState = _state.value
+                            if (executionState is AgentState.Error) {
+                                val diagnosis = ErrorDiagnosis.fromThrowable(
+                                    IllegalStateException(executionState.message),
+                                    "Action execution"
+                                )
+                                _state.value = AgentState.Error(diagnosis.display(executionState.message))
+                                graphifyRepo.logTask(safeCommand, "failed: ${diagnosis.display(executionState.message)}", universalAdapter.getProviderName(), latency)
                                 return@fold
                             }
 
@@ -192,25 +227,10 @@ RULES:
                         },
 
                         onFailure = { error ->
-                            val msg = when {
-                                error.message?.contains("401") == true ->
-                                    "Invalid API key"
-
-                                error.message?.contains("429") == true ->
-                                    "Rate limited — wait a moment"
-
-                                error.message?.contains("timeout") == true ->
-                                    "Request timed out"
-
-                                error.message?.contains("Unable to resolve") == true ->
-                                    "Network error — check connection"
-
-                                else -> {
-                                    Log.e("JarvisAgent", "Ollama/agent request failed", error)
-                                    "Agent failure [${error.javaClass.simpleName}]: ${error.message ?: error.cause?.message ?: "no error message"}"
-                                }
-                            }
-
+                            Log.e("JarvisAgent", "Ollama/agent request failed", error)
+                            val detail = "${error.javaClass.simpleName}: ${error.message ?: error.cause?.message ?: "no error message"}"
+                            val diagnosis = ErrorDiagnosis.fromThrowable(error, "Ollama request")
+                            val msg = diagnosis.display(detail)
                             _state.value = AgentState.Error(msg)
 
                             graphifyRepo.logTask(
