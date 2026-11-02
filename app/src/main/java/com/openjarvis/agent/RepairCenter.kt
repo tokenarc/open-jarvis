@@ -1,7 +1,6 @@
 package com.openjarvis.agent
 
 import android.content.Context
-import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -9,7 +8,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /** Persistent diagnostics, stack traces and Ollama-generated patch proposals.
@@ -18,7 +16,15 @@ import java.util.concurrent.TimeUnit
 class RepairCenter(context: Context) {
     private val app = context.applicationContext
     private val history = app.getSharedPreferences("jarvis_repair_history_v1", Context.MODE_PRIVATE)
-    private val provider = app.getSharedPreferences("jarvis_encrypted_prefs", Context.MODE_PRIVATE)
+    private val provider = runCatching {
+        val key = androidx.security.crypto.MasterKey.Builder(app)
+            .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM).build()
+        androidx.security.crypto.EncryptedSharedPreferences.create(
+            app, "jarvis_encrypted_prefs", key,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }.getOrElse { app.getSharedPreferences("jarvis_encrypted_prefs", Context.MODE_PRIVATE) }
     private val http = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(90, TimeUnit.SECONDS)
