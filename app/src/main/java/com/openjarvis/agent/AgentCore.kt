@@ -173,7 +173,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
 """.trimIndent()
                                 val repairResult = universalAdapter.complete(
                                     repairSystem,
-                                    "Original command: $safeCommand\\nValidation error: $firstReason\\nInvalid response: ${rawJson.take(3500)}"
+                                    listOf("Original command: $safeCommand", "Validation error: $firstReason", "Invalid response: ${rawJson.take(3500)}").joinToString(" | ")
                                 )
                                 val repairedResponse = repairResult.getOrNull()
                                 if (!repairedResponse.isNullOrBlank()) {
@@ -186,7 +186,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                             if (!validation.isValid) {
                                 val reason = validation.errors.firstOrNull() ?: "Empty action plan"
                                 val diagnosis = ErrorDiagnosis.invalidPlan(reason)
-                                val detail = "raw=${responseForDiagnostics.take(240).replace('\\n', ' ')}"
+                                val detail = "raw=" + responseForDiagnostics.take(240).replace("\n", " ")
                                 _state.value = AgentState.Error(diagnosis.display(detail))
                                 graphifyRepo.logTask(safeCommand, "failed: ${diagnosis.display(detail)}", universalAdapter.getProviderName(), latency)
                                 return@fold
