@@ -22,17 +22,20 @@ object ErrorDiagnosis {
             "timed out" in detail || "timeout" in detail ->
                 Diagnosis("JARVIS-NET-001", stage, "Ollama response timed out",
                     "Check that Ollama is running, the model is loaded, and the device can reach its server.", true)
-            "unable to resolve" in detail || "failed to connect" in detail ||
-                "connection refused" in detail || "connectexception" in detail ->
+            "unable to resolve" in detail || "unknownhostexception" in detail ||
+                "failed to connect" in detail || "connection refused" in detail ||
+                "connectexception" in detail || "socketexception" in detail ||
+                "sockettimeoutexception" in detail ->
                 Diagnosis("JARVIS-OLLAMA-001", stage, "Cannot connect to the Ollama server",
                     "Start Ollama and verify the configured server URL and port 11434.", true)
             "model" in detail && ("not found" in detail || "does not exist" in detail) ->
                 Diagnosis("JARVIS-OLLAMA-002", stage, "Configured Ollama model is missing",
                     "Pull the configured model in Ollama, then test the connection again.", false)
-            "accessibility service unavailable" in detail ->
+            "accessibility service unavailable" in detail || "accessibilityservice not connected" in detail ->
+
                 Diagnosis("JARVIS-ACCESS-001", stage, "Android Accessibility Service is not connected",
                     "Enable Open Jarvis Accessibility Service in Android Settings, then retry.", false)
-            "app not found" in detail ->
+            "app not found" in detail || "could not open app" in detail ->
                 Diagnosis("JARVIS-APP-001", stage, "The requested app could not be matched to an installed app",
                     "Check the app name or install the app, then use its visible launcher name.", false)
             "could not tap" in detail || "tap failed" in detail ->
@@ -47,15 +50,27 @@ object ErrorDiagnosis {
             "action not supported" in detail || "unsupported action" in detail ->
                 Diagnosis("JARVIS-ACTION-001", stage, "The generated action is not implemented by the executor",
                     "Use a supported action or add and test an executor implementation before using it.", false)
-            "http 429" in detail ->
+            "http 429" in detail || "too many requests" in detail ->
                 Diagnosis("JARVIS-OLLAMA-429", stage, "Ollama server is overloaded",
                     "Wait briefly and retry after the model finishes its current request.", true)
-            "http 5" in detail ->
+            "http 5" in detail || "service unavailable" in detail || "bad gateway" in detail ->
                 Diagnosis("JARVIS-OLLAMA-5XX", stage, "Ollama server returned a server error",
                     "Check Ollama logs and available RAM, then retry.", true)
+            "outofmemoryerror" in detail || "out of memory" in detail ->
+                Diagnosis("JARVIS-MEM-001", stage, "Android ran out of memory",
+                    "Close unused apps, reduce the local model load, and retry after memory is available.", false)
+            "securityexception" in detail || "permission denied" in detail ->
+                Diagnosis("JARVIS-PERM-001", stage, "Android denied a required permission or operation",
+                    "Enable the required Android permission or Accessibility access in system settings.", false)
+            "illegalstateexception" in detail ->
+                Diagnosis("JARVIS-STATE-001", stage, "A component was used in an invalid runtime state",
+                    "Reinitialize the affected component and inspect the recorded stack trace.", false)
+            "jsonexception" in detail || "invalid ai json" in detail ->
+                Diagnosis("JARVIS-JSON-001", stage, "AI response could not be parsed as an action plan",
+                    "Request one strict JSON-only repair response, then stop if validation still fails.", true)
             else ->
                 Diagnosis("JARVIS-UNKNOWN-001", stage, "Unexpected failure",
-                    "Review the technical detail and diagnostic log before changing settings.", false)
+                    "Capture the full stack trace, isolate the failing component, and apply only a verified recovery; no unsafe automatic replay.", false)
         }
     }
 
