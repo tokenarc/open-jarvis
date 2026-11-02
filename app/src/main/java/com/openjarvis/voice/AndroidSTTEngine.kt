@@ -116,8 +116,20 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
 
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            val deviceLanguage = Locale.getDefault().toLanguageTag()
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE,
+                if (deviceLanguage.startsWith("hi") || deviceLanguage.startsWith("mr") || deviceLanguage.startsWith("en")) deviceLanguage else "hi-IN"
+            )
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN")
+            if (android.os.Build.VERSION.SDK_INT >= 34) {
+                putExtra("android.speech.extra.ENABLE_LANGUAGE_DETECTION", true)
+                putExtra(
+                    "android.speech.extra.LANGUAGE_DETECTION_ALLOWED_LANGUAGES",
+                    arrayListOf("hi-IN", "mr-IN", "en-IN")
+                )
+            }
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_TIMEOUT_MS)
         }
