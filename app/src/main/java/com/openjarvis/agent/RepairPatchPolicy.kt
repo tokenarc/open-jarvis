@@ -11,7 +11,7 @@ object RepairPatchPolicy {
 
     fun validateDiff(diff: String): Boolean {
         if (diff.isBlank() || diff.length > 24000) return false
-        val paths = Regex("(?m)^(?:\+\+\+|---) ([^\t\n]+)")
+        val paths = Regex("""(?m)^(?:\+\+\+|---) ([^\t\n]+)""")
             .findAll(diff).map { it.groupValues[1] }
             .filter { it != "/dev/null" }.toList()
         return paths.isNotEmpty() && paths.all(::isAllowedPath) &&
