@@ -76,6 +76,9 @@ INSTALLED AI APPS: {AI_APPS}
 RECENT MEMORY CONTEXT: {GRAPHIFY_CONTEXT}
 
 RULES:
+- Understand Hindi, Marathi, and English commands.
+- For open_app, package name is sufficient; label is optional.
+- Never emit actions unsupported by the executor.
 - Always start complex tasks with open_app
 - Add wait_for after open_app to confirm app loaded
 - If screen content is empty or unclear, add read_screen as first action
@@ -212,6 +215,10 @@ RULES:
                             )
 
                             executeActions(actions)
+                            if (_state.value is AgentState.Error) {
+                                graphifyRepo.logTask(safeCommand, "failed: action execution", universalAdapter.getProviderName(), latency)
+                                return@fold
+                            }
 
                             graphifyRepo.logTask(
                                 command = safeCommand,
@@ -300,49 +307,89 @@ RULES:
                 Action.OPEN_APP -> {
                     val label = action.label
 
-                    if (label != null) {
-                        val packageName = findPackageByLabel(label)
-
-                        if (packageName != null) {
-                            JarvisAccessibilityService.instance
-                                ?.openAppByPackage(packageName)
-
-                            graphifyRepo.logAppOpened(
-                                packageName,
-                                label
-                            )
-                        } else {
-                            _state.value =
-                                AgentState.Error("App not found: $label")
-                            return
-                        }
+                    val packageName = action.packageName ?: label?.let { findPackageByLabel(it) }
+                    if (packageName.isNullOrBlank()) {
+                        _state.value = AgentState.Error("App not found: ${label ?: "missing package name"}")
+                        return
                     }
+                    val service = JarvisAccessibilityService.instance
+                    if (service == null || !service.openAppByPackage(packageName)) {
+                        _state.value = AgentState.Error("Could not open app: ${label ?: packageName}")
+                        return
+                    }
+                    graphifyRepo.logAppOpened(packageName, label ?: packageName)
                 }
 
                 Action.TAP -> {
-                    action.text?.let { text ->
-                        JarvisAccessibilityService.instance
-                            ?.tapByText(text)
+                    val target = action.text
+                    val service = JarvisAccessibilityService.instance
+                    if (target.isNullOrBlank() || service == null || !service.tapByText(target)) {
+                        _state.value = AgentState.Error("Could not tap screen text: ${target ?: "missing target"}")
+                        return
                     }
                 }
 
                 Action.TYPE -> {
-                    action.value?.let { value ->
-                        JarvisAccessibilityService.instance
-                            ?.typeText(value)
+                    val value = action.value
+                    val service = JarvisAccessibilityService.instance
+                    if (value.isNullOrEmpty() || service == null || !service.typeText(value)) {
+                        _state.value = AgentState.Error("Could not type: input field not found")
+                        return
                     }
                 }
 
                 Action.PRESS_BACK -> {
-                    JarvisAccessibilityService.instance?.pressBack()
+                    if (JarvisAccessibilityService.instance?.pressBack() != true) {
+                        _state.value = AgentState.Error("Back action failed")
+                        return
+                    }
                 }
 
                 Action.PRESS_HOME -> {
-                    JarvisAccessibilityService.instance?.pressHome()
+                    if (JarvisAccessibilityService.instance?.pressHome() != true) {
+                        _state.value = AgentState.Error("Home action failed")
+                        return
+                    }
                 }
 
                 Action.PRESS_RECENTS -> {
-                    JarvisAccessibilityService.instance?.pressRecents()
+                    if (JarvisAccessibilityService.instance?.pressRecents() != true) {
+                        _state.value = AgentState.Error("Recent apps action failed")
+                        return
+                    }
+                }
+
+                Action.WAIT_FOR -> {
+                    val expected = action.text
+                    val timeout = action.timeoutMs.coerceIn(500L, 15000L)
+                    val started = System.currentTimeMillis()
+                    var found = false
+                    while (expected != null && System.currentTimeMillis() - started < timeout) {
+                        if (screenReader.extractAllText().contains(expected, ignoreCase = true)) {
+                            found = true
+                            break
+                        }
+                        kotlinx.coroutines.delay(300)
+                    }
+                    if (!found) {
+                        _state.value = AgentState.Error("Timed out waiting for: ${expected ?: "screen text"}")
+                        return
+                    }
+                }
+
+                Action.READ_SCREEN -> {
+                    val screen = screenReader.extractAllText()
+                    if (screen.isBlank()) {
+                        _state.value = AgentState.Error("Could not read current screen")
+                        return
+                    }
+                    workingMemory.set(action.outputKey ?: "page_text", screen)
+                }
+
+                Action.SCREENSHOT, Action.TAP_COORDS, Action.LONG_PRESS,
+                Action.SWIPE, Action.SCROLL, Action.CLEAR_TYPE -> {
+                    _state.value = AgentState.Error("Action not supported yet: ${action.action}")
+                    return
                 }
 
                 Action.AI_PROMPT -> {
