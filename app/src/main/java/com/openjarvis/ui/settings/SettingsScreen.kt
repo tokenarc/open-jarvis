@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openjarvis.llm.UniversalAdapter
 import com.openjarvis.ui.theme.VoidColor
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -43,6 +44,18 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val providerPrefs = remember {
+        val key = androidx.security.crypto.MasterKey.Builder(context)
+            .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        androidx.security.crypto.EncryptedSharedPreferences.create(
+            context,
+            "jarvis_encrypted_prefs",
+            key,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
     val voicePrefs = remember {
         val masterKey = androidx.security.crypto.MasterKey.Builder(context)
             .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
@@ -55,10 +68,15 @@ fun SettingsScreen(
             androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
     }
-    var selectedProvider by remember { mutableStateOf("Groq") }
-    var baseUrl by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("openai/gpt-oss-120b") }
+    val savedProvider = providerPrefs.getString("provider_name", "Groq") ?: "Groq"
+    val savedModel = providerPrefs.getString("provider_model", "") ?: ""
+    val migratedModel = if (savedProvider == "Groq" && savedModel in setOf(
+        "llama-3.1-70b-versatile", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"
+    )) "openai/gpt-oss-120b" else savedModel.ifBlank { UniversalAdapter.getDefaultModel(savedProvider) }
+    var selectedProvider by remember { mutableStateOf(savedProvider) }
+    var baseUrl by remember { mutableStateOf(providerPrefs.getString("provider_base_url", "") ?: "") }
+    var apiKey by remember { mutableStateOf(providerPrefs.getString("provider_api_key", "") ?: "") }
+    var model by remember { mutableStateOf(migratedModel) }
     var showBaseUrlField by remember { mutableStateOf(false) }
     var showProvidersDropdown by remember { mutableStateOf(false) }
     var showPassword by remember { mutableStateOf(false) }
@@ -147,6 +165,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 TestConnectionButton(
+                    provider = selectedProvider,
                     apiKey = apiKey,
                     baseUrl = baseUrl,
                     model = model,
@@ -592,12 +611,15 @@ fun FloatingLabelTextField(
 
 @Composable
 private fun TestConnectionButton(
+    provider: String,
     apiKey: String,
     baseUrl: String,
     model: String,
     onSave: (String, String, String, String) -> Unit
 ) {
     var testState by remember { mutableStateOf<TestState>(TestState.Idle) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     
     val borderColor by animateColorAsState(
         targetValue = when (testState) {
@@ -619,8 +641,19 @@ private fun TestConnectionButton(
     
     OutlinedButton(
         onClick = {
-            onSave("Groq", baseUrl, apiKey, model)
-            testState = TestState.Success(150)
+            if (apiKey.isBlank() && provider != "Ollama (Local)" && provider != "Local (LlamaCpp)") {
+                testState = TestState.Error("API key is required")
+            } else {
+                testState = TestState.Loading
+                onSave(provider, baseUrl, apiKey, model)
+                scope.launch {
+                    val result = UniversalAdapter(context).testConnection()
+                    testState = result.fold(
+                        onSuccess = { TestState.Success(it) },
+                        onFailure = { TestState.Error(it.message ?: "Connection failed") }
+                    )
+                }
+            }
         },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -642,7 +675,7 @@ private fun TestConnectionButton(
                 Text("Connected — ${state.ms}ms")
             }
             is TestState.Error -> {
-                Text("Failed — check key")
+                Text("Failed — \${state.message}")
             }
         }
     }
