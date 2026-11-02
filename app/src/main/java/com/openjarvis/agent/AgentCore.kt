@@ -38,6 +38,7 @@ class AgentCore(private val context: Context) {
     private val appAnalyzer = AppAnalyzer(context)
     private val aiAppInteractor = AIAppInteractor(context)
     private val repairMemory = RepairMemory(context)
+    private val selfHealing = SelfHealingEngine(context)
 
     private var workingMemory = TaskWorkingMemory()
 
@@ -260,6 +261,10 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                                 "",
                                 0
                             )
+                            if (!deviceActionsStarted && diagnosis.retryable &&
+                                selfHealing.claimRetry(safeCommand, diagnosis.code)) {
+                                scheduleSafeRetry(safeCommand, diagnosis.code)
+                            }
                         }
                     )
                 } catch (e: NullPointerException) {
@@ -275,20 +280,18 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                     // A single retry is allowed only before the first device action.
                     // Never replay a partially executed sequence (send/delete/payment risk).
                     val retryKey = cleanCommand.trim().lowercase()
-                    if (!deviceActionsStarted && retryKey.isNotBlank() && nullRepairAttempts.add(retryKey)) {
-                        _state.value = AgentState.Running("self-repair: retrying safe pre-action stage once...")
-                        scope.launch {
-                            kotlinx.coroutines.delay(400)
-                            executeTask(cleanCommand)
-                        }
+                    if (!deviceActionsStarted && retryKey.isNotBlank() &&
+                        selfHealing.claimRetry(cleanCommand, "JARVIS-NPE-001")) {
+                        scheduleSafeRetry(cleanCommand, "JARVIS-NPE-001")
                     } else if (!trace.isNullOrBlank()) {
                         Log.e("JarvisAgent", "NPE recovery stopped: unsafe to retry or retry already used")
                     }
                 } catch (e: Exception) {
                     Log.e("JarvisAgent", "Unhandled agent exception at $currentStage", e)
                     val detail = "${e.javaClass.simpleName}: ${e.message ?: e.cause?.message ?: e.javaClass.name}"
-                    repairMemory.recordFailure("JARVIS-UNKNOWN-001", currentStage)
-                    _state.value = AgentState.Error("Agent failure [$currentStage] [$detail]")
+                    val diagnosis = ErrorDiagnosis.fromThrowable(e, currentStage)
+                    repairMemory.recordFailure(diagnosis.code, currentStage)
+                    _state.value = AgentState.Error(diagnosis.display(detail))
 
                     graphifyRepo.logTask(
                         cleanCommand,
@@ -296,8 +299,20 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                         universalAdapter.getProviderName(),
                         0
                     )
+                    if (!deviceActionsStarted && diagnosis.retryable &&
+                        selfHealing.claimRetry(cleanCommand, diagnosis.code)) {
+                        scheduleSafeRetry(cleanCommand, diagnosis.code)
+                    }
                 }
             }
+        }
+    }
+
+    private fun scheduleSafeRetry(command: String, code: String) {
+        _state.value = AgentState.Running("self-healing [$code]: safe retry once...")
+        scope.launch {
+            kotlinx.coroutines.delay(700)
+            executeTask(command)
         }
     }
 
