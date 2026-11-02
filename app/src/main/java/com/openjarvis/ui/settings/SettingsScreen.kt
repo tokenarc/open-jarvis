@@ -58,7 +58,7 @@ fun SettingsScreen(
     var selectedProvider by remember { mutableStateOf("Groq") }
     var baseUrl by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("llama-3.1-70b-versatile") }
+    var model by remember { mutableStateOf("openai/gpt-oss-120b") }
     var showBaseUrlField by remember { mutableStateOf(false) }
     var showProvidersDropdown by remember { mutableStateOf(false) }
     var showPassword by remember { mutableStateOf(false) }
