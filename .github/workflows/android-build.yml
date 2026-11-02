@@ -66,16 +66,23 @@ jobs:
         run: test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Android emulator launch smoke test
+        timeout-minutes: 12
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
           arch: x86_64
           profile: pixel_2
-          emulator-boot-timeout: 600
+          emulator-boot-timeout: 180
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
           disable-animations: true
           script: |
-            timeout 240s adb install -r -t app/build/outputs/apk/debug/app-debug.apk
+            timeout 120s adb wait-for-device
+            for i in $(seq 1 60); do
+              [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')" = "1" ] && break
+              sleep 2
+            done
+            [ "$(adb shell getprop sys.boot_completed | tr -d '\\r')" = "1" ]
+            timeout 120s adb install -r -t app/build/outputs/apk/debug/app-debug.apk
             adb shell pm grant com.openjarvis android.permission.RECORD_AUDIO
             adb shell settings put secure enabled_accessibility_services com.openjarvis/com.openjarvis.accessibility.JarvisAccessibilityService
             adb shell settings put secure accessibility_enabled 1
