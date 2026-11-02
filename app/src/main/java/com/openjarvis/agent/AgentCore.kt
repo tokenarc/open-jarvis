@@ -159,50 +159,14 @@ RULES:
                             val validation =
                                 LLMResponseValidator.validate(rawJson)
 
-                            val rawForParsing =
-                                if (!validation.isValid &&
-                                    validation.errors.isNotEmpty()
-                                ) {
-                                    _state.value = AgentState.Error(
-                                        "Invalid response: ${validation.errors.first()}"
-                                    )
-                                    graphifyRepo.logTask(
-                                        safeCommand,
-                                        "failed: validation error",
-                                        "",
-                                        0
-                                    )
-                                    return@fold
-                                } else {
-                                    rawJson
-                                }
-
-                            val actions =
-                                ActionJsonParser.parse(rawForParsing)
-                                    ?: run {
-                                        val retry =
-                                            universalAdapter.complete(
-                                                fullSystem,
-                                                "$safeCommand\n\nRespond with JSON array ONLY. No other text."
-                                            )
-
-                                        retry.getOrNull()?.let {
-                                            ActionJsonParser.parse(it)
-                                        }
-                                    }
-
-                            if (actions == null) {
-                                _state.value = AgentState.Error(
-                                    "Could not parse AI response"
-                                )
-                                graphifyRepo.logTask(
-                                    safeCommand,
-                                    "failed: parse error",
-                                    "",
-                                    0
-                                )
+                            if (!validation.isValid) {
+                                val reason = validation.errors.firstOrNull() ?: "Empty action plan"
+                                _state.value = AgentState.Error("Invalid AI action plan: $reason")
+                                graphifyRepo.logTask(safeCommand, "failed: validation error", universalAdapter.getProviderName(), latency)
                                 return@fold
                             }
+
+                            val actions = validation.actions
 
                             _state.value = AgentState.Running(
                                 "executing ${actions.size} actions..."
