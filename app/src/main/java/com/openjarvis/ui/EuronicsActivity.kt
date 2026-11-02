@@ -3,6 +3,7 @@ package com.openjarvis.ui
 import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
 import android.webkit.*
 import androidx.webkit.WebViewAssetLoader
@@ -73,6 +74,12 @@ class EuronicsActivity : ComponentActivity() {
         reportWebView.webViewClient = object : WebViewClientCompat() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                 return assetLoader.shouldInterceptRequest(request.url)
+            }
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                view?.evaluateJavascript("document.title") { title ->
+                    Log.i("EuronicsWebView", "EURONICS_HTML_TITLE:$title")
+                }
             }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 if (request?.isForMainFrame == true) {

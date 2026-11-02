@@ -2,7 +2,7 @@ name: Android Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/euronics-webview-integration]
     paths:
       - "app/**"
       - "*.gradle"
@@ -72,3 +72,9 @@ jobs:
               exit 1
             fi
             adb shell dumpsys activity activities | grep -F 'com.openjarvis/.ui.MainActivity'
+            adb shell am start -W -n com.openjarvis/.ui.EuronicsActivity
+            for i in $(seq 1 15); do
+              if adb logcat -d | grep -F 'EURONICS_HTML_TITLE:'; then break; fi
+              sleep 1
+            done
+            adb logcat -d | grep -F 'EURONICS_HTML_TITLE:'
