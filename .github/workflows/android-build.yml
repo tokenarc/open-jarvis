@@ -64,11 +64,22 @@ jobs:
             adb shell pm grant com.openjarvis android.permission.RECORD_AUDIO
             adb shell settings put secure enabled_accessibility_services com.openjarvis/com.openjarvis.accessibility.JarvisAccessibilityService
             adb shell settings put secure accessibility_enabled 1
+            adb shell appops set com.openjarvis SYSTEM_ALERT_WINDOW allow
             adb shell am start -W -n com.openjarvis/.ui.MainActivity
-            sleep 6
+            sleep 8
             adb shell dumpsys accessibility | grep -F 'JarvisAccessibilityService'
             adb shell pidof com.openjarvis >/dev/null || { adb logcat -d -t 1500; exit 1; }
-            adb shell dumpsys activity activities | grep -F 'com.openjarvis/.ui.MainActivity'
-            adb shell am start -W -n com.openjarvis/.ui.EuronicsActivity
-            sleep 12
+            adb shell uiautomator dump /sdcard/window.xml >/dev/null
+            adb shell cat /sdcard/window.xml | grep -F 'EURONICS SERVICE REPORT'
+            python3 - <<'PY'
+            import re, subprocess, sys
+            xml = subprocess.check_output(["adb", "shell", "cat", "/sdcard/window.xml"], text=True)
+            match = re.search(r'text="EURONICS SERVICE REPORT".*?bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml)
+            if not match:
+                print("Euronics dashboard button not found")
+                sys.exit(1)
+            x1,y1,x2,y2 = map(int, match.groups())
+            subprocess.check_call(["adb","shell","input","tap",str((x1+x2)//2),str((y1+y2)//2)])
+            PY
+            sleep 15
             adb logcat -d | grep -F 'EURONICS_HTML_TITLE:'
