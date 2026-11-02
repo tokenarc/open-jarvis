@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 class AgentCore(private val context: Context) {
 
@@ -42,6 +43,7 @@ class AgentCore(private val context: Context) {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val taskMutex = Mutex()
+    private val nullRepairAttempts = ConcurrentHashMap.newKeySet<String>()
 
     private val _state = MutableStateFlow<AgentState>(AgentState.Idle)
     val state: StateFlow<AgentState> = _state
@@ -88,7 +90,10 @@ RULES:
 
         scope.launch {
             taskMutex.withLock {
+                var currentStage = "initialization"
+                var deviceActionsStarted = false
                 try {
+                    currentStage = "command normalization"
                     val normalizedCommand = repairMemory.normalize(CommandDictionary.normalize(cleanCommand))
                     val sanitized = PromptSanitizer.sanitize(normalizedCommand)
 
@@ -118,16 +123,19 @@ RULES:
 
                     _state.value = AgentState.Running("analyzing task...")
 
+                    currentStage = "task routing"
                     val plan = taskRouter.analyze(safeCommand)
 
                     _state.value = AgentState.Running("reading screen...")
 
+                    currentStage = "screen reading"
                     val screenText = withContext(Dispatchers.IO) {
                         screenReader.extractAllText()
                     }
 
                     _state.value = AgentState.Running("getting context...")
 
+                    currentStage = "repair memory / graph context"
                     val memoryContext =
                         graphifyRepo.buildMemoryContext(safeCommand)
 
@@ -148,6 +156,7 @@ RULES:
 
                     val startTime = System.currentTimeMillis()
 
+                    currentStage = "Ollama inference"
                     val result = universalAdapter.complete(
                         fullSystem,
                         safeCommand
@@ -202,6 +211,8 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                                 "executing ${actions.size} actions..."
                             )
 
+                            currentStage = "device action execution"
+                            deviceActionsStarted = true
                             executeActions(actions)
                             val executionState = _state.value
                             if (executionState is AgentState.Error) {
@@ -226,8 +237,11 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                                 latencyMs = latency
                             )
 
+                            currentStage = "post-task analysis"
                             analysisEngine.analyzeLastTask()
 
+                            nullRepairAttempts.remove(cleanCommand.trim().lowercase())
+                            repairMemory.recordRecovery("TASK-EXECUTION")
                             _state.value =
                                 AgentState.Done("done in ${latency}ms")
                         },
@@ -248,16 +262,38 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                             )
                         }
                     )
+                } catch (e: NullPointerException) {
+                    // NPE.message is commonly null; preserve the actual stack trace and stage.
+                    val trace = Log.getStackTraceString(e)
+                    val frames = e.stackTrace.take(5).joinToString(" <- ") { "${it.className}.${it.methodName}:${it.lineNumber}" }
+                    val detail = "NullPointerException at $currentStage; ${e.message ?: "message unavailable"}; trace=$frames"
+                    Log.e("JarvisAgent", detail, e)
+                    repairMemory.recordFailure("JARVIS-NPE-001", currentStage)
+                    _state.value = AgentState.Error("Self-repair diagnosis [$detail]")
+                    graphifyRepo.logTask(cleanCommand, "failed: $detail", universalAdapter.getProviderName(), 0)
+
+                    // A single retry is allowed only before the first device action.
+                    // Never replay a partially executed sequence (send/delete/payment risk).
+                    val retryKey = cleanCommand.trim().lowercase()
+                    if (!deviceActionsStarted && retryKey.isNotBlank() && nullRepairAttempts.add(retryKey)) {
+                        _state.value = AgentState.Running("self-repair: retrying safe pre-action stage once...")
+                        scope.launch {
+                            kotlinx.coroutines.delay(400)
+                            executeTask(cleanCommand)
+                        }
+                    } else if (!trace.isNullOrBlank()) {
+                        Log.e("JarvisAgent", "NPE recovery stopped: unsafe to retry or retry already used")
+                    }
                 } catch (e: Exception) {
-                    Log.e("JarvisAgent", "Unhandled agent exception", e)
-                    val detail = "${e.javaClass.simpleName}: ${e.message ?: e.cause?.message ?: "no error message"}"
-                    repairMemory.recordFailure("JARVIS-UNKNOWN-001", "Agent pipeline")
-                    _state.value = AgentState.Error("Agent failure [$detail]")
+                    Log.e("JarvisAgent", "Unhandled agent exception at $currentStage", e)
+                    val detail = "${e.javaClass.simpleName}: ${e.message ?: e.cause?.message ?: e.javaClass.name}"
+                    repairMemory.recordFailure("JARVIS-UNKNOWN-001", currentStage)
+                    _state.value = AgentState.Error("Agent failure [$currentStage] [$detail]")
 
                     graphifyRepo.logTask(
                         cleanCommand,
                         "failed: $detail",
-                        "",
+                        universalAdapter.getProviderName(),
                         0
                     )
                 }
