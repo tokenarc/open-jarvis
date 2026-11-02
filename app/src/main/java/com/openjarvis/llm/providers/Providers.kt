@@ -260,6 +260,27 @@ class OllamaProvider(
                     })
                 })
                 put("stream", false)
+                put("format", JSONObject().apply {
+                    put("type", "array")
+                    put("items", JSONObject().apply {
+                        put("type", "object")
+                        put("properties", JSONObject().apply {
+                            put("action", JSONObject().put("type", "string").put("enum", JSONArray(listOf(
+                                "open_app", "tap", "type", "press_back", "press_home",
+                                "press_recents", "wait_for", "read_screen", "extract_text", "error"
+                            ))))
+                            put("package", JSONObject().put("type", "string"))
+                            put("label", JSONObject().put("type", "string"))
+                            put("text", JSONObject().put("type", "string"))
+                            put("value", JSONObject().put("type", "string"))
+                            put("timeout_ms", JSONObject().put("type", "integer"))
+                            put("message", JSONObject().put("type", "string"))
+                            put("outputKey", JSONObject().put("type", "string"))
+                        })
+                        put("required", JSONArray(listOf("action")))
+                    })
+                })
+                put("options", JSONObject().put("temperature", 0))
             }.toString()
             
             val request = Request.Builder()
