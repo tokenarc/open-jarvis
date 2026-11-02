@@ -92,7 +92,6 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
                     }
                     android.util.Log.e("OpenJarvisSTT", "SpeechRecognizer error=$error message=$errorMessage")
                     val detailedMessage = "$errorMessage (code $error)"
-                    }
                     if (pendingResult.isNullOrBlank()) {
                         currentErrorCallback?.invoke(detailedMessage)
                     }
