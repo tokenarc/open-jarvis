@@ -78,11 +78,6 @@ class OverlayService : Service() {
             }
         }
         
-        try {
-            voiceManager.initialize()
-        } catch (e: Exception) {
-            // Voice initialization
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
