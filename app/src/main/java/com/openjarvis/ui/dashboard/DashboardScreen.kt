@@ -508,7 +508,7 @@ private fun AppInitialBadge(label: String) {
 
 @Composable
 private fun QuickAppsSection(apps: List<AppNode>, alpha: Float) {
-    Column(alpha = alpha) {
+    Column(modifier = Modifier.alpha(alpha)) {
         Text(
             text = "QUICK APPS",
             style = TextStyle(
