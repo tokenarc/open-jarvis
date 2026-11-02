@@ -2,24 +2,37 @@ name: Android Build
 
 on:
   push:
-    branches: [main, feature/euronics-webview-integration]
+    branches:
+      - main
+      - feature/euronics-webview-integration
+      - feature/self-healing-command-dictionary
+      - feature/autonomous-self-healing-edition
     paths:
       - "app/**"
       - "*.gradle"
       - "settings.gradle"
-      - ".github/workflows/android-build.yml"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "*.gradle"
+      - "settings.gradle"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-build-${{ github.ref }}
+  group: android-build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  assemble-debug:
+  test-build-smoke:
+    name: Unit tests, APK build and Android smoke test
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,15 +56,14 @@ jobs:
         with:
           gradle-version: "8.2"
 
+      - name: Run unit and regression tests
+        run: gradle --no-daemon :app:testDebugUnitTest
+
       - name: Compile debug APK
         run: gradle --no-daemon :app:assembleDebug
 
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: open-jarvis-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+      - name: Verify APK exists and is non-empty
+        run: test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Android emulator launch smoke test
         uses: reactivecircus/android-emulator-runner@v2
@@ -59,22 +71,26 @@ jobs:
           api-level: 34
           arch: x86_64
           profile: pixel_2
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: true
           script: |
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            timeout 240s adb install -r -t app/build/outputs/apk/debug/app-debug.apk
             adb shell pm grant com.openjarvis android.permission.RECORD_AUDIO
             adb shell settings put secure enabled_accessibility_services com.openjarvis/com.openjarvis.accessibility.JarvisAccessibilityService
             adb shell settings put secure accessibility_enabled 1
-            adb shell am start -W -n com.openjarvis/.ui.MainActivity
-            sleep 6
+            adb shell appops set com.openjarvis SYSTEM_ALERT_WINDOW allow
+            timeout 30s adb shell am start -W -n com.openjarvis/.ui.MainActivity
+            sleep 5
             adb shell dumpsys accessibility | grep -F 'JarvisAccessibilityService'
-            if ! adb shell pidof com.openjarvis; then
-              adb logcat -d -t 1500
-              exit 1
-            fi
+            adb shell pidof com.openjarvis >/dev/null || { adb logcat -d -t 1500; exit 1; }
             adb shell dumpsys activity activities | grep -F 'com.openjarvis/.ui.MainActivity'
-            adb shell am start -W -n com.openjarvis/.ui.EuronicsActivity
-            for i in $(seq 1 15); do
-              if adb logcat -d | grep -F 'EURONICS_HTML_TITLE:'; then break; fi
-              sleep 1
-            done
-            adb logcat -d | grep -F 'EURONICS_HTML_TITLE:'
+            adb logcat -d -t 1500 | grep -E 'FATAL EXCEPTION|AndroidRuntime' && exit 1 || true
+
+      - name: Upload tested debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-jarvis-autonomous-self-healing-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30

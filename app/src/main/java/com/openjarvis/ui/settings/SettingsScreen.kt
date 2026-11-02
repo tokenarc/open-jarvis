@@ -68,13 +68,19 @@ fun SettingsScreen(
             androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
     }
-    val savedProvider = providerPrefs.getString("provider_name", "Groq") ?: "Groq"
-    val savedModel = providerPrefs.getString("provider_model", "") ?: ""
-    val migratedModel = if (savedProvider == "Groq" && savedModel in setOf(
-        "llama-3.1-70b-versatile", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"
-    )) "openai/gpt-oss-120b" else savedModel.ifBlank { UniversalAdapter.getDefaultModel(savedProvider) }
+    val savedProvider = "Ollama (Local)"
+    val previousProvider = providerPrefs.getString("provider_name", "") ?: ""
+    val savedModel = if (previousProvider == "Ollama (Local)") providerPrefs.getString("provider_model", "") ?: "" else ""
+    val migratedModel = savedModel.ifBlank { UniversalAdapter.DEFAULT_OLLAMA_MODEL }
     var selectedProvider by remember { mutableStateOf(savedProvider) }
-    var baseUrl by remember { mutableStateOf(providerPrefs.getString("provider_base_url", "") ?: "") }
+    var baseUrl by remember {
+        mutableStateOf(
+            if (previousProvider == "Ollama (Local)") {
+                (providerPrefs.getString("provider_base_url", UniversalAdapter.DEFAULT_OLLAMA_URL)
+                    ?: UniversalAdapter.DEFAULT_OLLAMA_URL).ifBlank { UniversalAdapter.DEFAULT_OLLAMA_URL }
+            } else UniversalAdapter.DEFAULT_OLLAMA_URL
+        )
+    }
     var apiKey by remember { mutableStateOf(providerPrefs.getString("provider_api_key", "") ?: "") }
     var model by remember { mutableStateOf(migratedModel) }
     var showBaseUrlField by remember { mutableStateOf(false) }
@@ -88,7 +94,7 @@ fun SettingsScreen(
     var sttMode by remember { mutableStateOf("Push to Talk") }
     
     LaunchedEffect(selectedProvider) {
-        showBaseUrlField = selectedProvider == "Custom"
+        showBaseUrlField = selectedProvider == "Custom" || selectedProvider == "Ollama (Local)"
     }
     
     val scrollState = rememberScrollState()
@@ -142,6 +148,7 @@ fun SettingsScreen(
                     isFocused = false,
                     isPassword = true,
                     showPassword = showPassword,
+                    visible = selectedProvider != "Ollama (Local)",
                     onTogglePassword = { showPassword = !showPassword }
                 )
                 
@@ -153,7 +160,7 @@ fun SettingsScreen(
                 )
                 
                 Text(
-                    text = "Works with any OpenAI-compatible API",
+                    text = "Ollama local model only · no cloud AI or API key",
                     style = TextStyle(
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight(400),
@@ -283,7 +290,7 @@ fun SettingsScreen(
                                     )
                                 )
                                 Text(
-                                    text = "Google Speech · Online",
+                                    text = "Android speech · offline when language packs are installed",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
                                         fontWeight = FontWeight(400),
@@ -293,7 +300,7 @@ fun SettingsScreen(
                                 )
                             }
                             Text(
-                                text = "Ready",
+                                text = "Check offline packs",
                                 style = TextStyle(
                                     fontFamily = FontFamily.Default,
                                     fontWeight = FontWeight(500),

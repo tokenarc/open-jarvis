@@ -51,6 +51,7 @@ fun DashboardScreen(
     var recentTasks by remember { mutableStateOf<List<TaskNode>>(emptyList()) }
     var mostUsedApps by remember { mutableStateOf<List<AppNode>>(emptyList()) }
     var isSystemActive by remember { mutableStateOf(true) }
+    var showSelfRepair by remember { mutableStateOf(false) }
     
     var heroAlpha by remember { mutableFloatStateOf(0f) }
     var statsAlpha by remember { mutableFloatStateOf(0f) }
@@ -95,6 +96,16 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
+                onClick = { showSelfRepair = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Void800)
+            ) {
+                Text("AUTONOMOUS SELF-REPAIR  •  DIAGNOSTICS / HISTORY", color = VoidColor.Cyan, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Button(
                 onClick = onOpenEuronics,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Violet)
@@ -121,6 +132,8 @@ fun DashboardScreen(
             onSettingsClick = onOpenSettings,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+
+        if (showSelfRepair) SelfRepairDashboardDialog(onDismiss = { showSelfRepair = false })
 
         FloatingActionButton(
             onClick = onStartOverlay,

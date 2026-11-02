@@ -21,36 +21,26 @@ class UniversalAdapter(private val context: Context) {
     )
     
     fun getActiveProvider(): LLMProvider {
-        val name = prefs.getString("provider_name", "Groq") ?: "Groq"
-        val baseUrl = prefs.getString("provider_base_url", "") ?: ""
-        val apiKey = prefs.getString("provider_api_key", "") ?: ""
-        val savedModel = prefs.getString("provider_model", "") ?: ""
-        val retiredGroqModels = setOf(
-            "llama-3.1-70b-versatile",
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant"
-        )
-        val model = if (name == "Groq" && (savedModel.isBlank() || savedModel in retiredGroqModels)) {
-            "openai/gpt-oss-120b".also {
-                prefs.edit().putString("provider_model", it).apply()
-            }
-        } else savedModel
-        
-        return when (name) {
-            "Groq" -> GroqProvider(apiKey, model)
-            "Google Gemini", "gemini" -> GeminiProvider(apiKey, model)
-            "OpenRouter" -> OpenRouterProvider(apiKey, model)
-            "Anthropic Claude" -> AnthropicProvider(apiKey, model)
-            "OpenAI" -> OpenAIProvider(apiKey, model)
-            "Ollama (Local)" -> OllamaProvider(baseUrl, model)
-            "Local (LlamaCpp)" -> {
-                val mm = getModelManager(context)
-                val tier = mm.getDownloadedTier() ?: ModelManager.ModelTier.MINIMUM
-                LlamaProvider(mm.getModelPath(tier), tier.displayName)
-            }
-            "Custom" -> CustomProvider(baseUrl, apiKey, model)
-            else -> CustomProvider(baseUrl, apiKey, model)
+        val wasOllama = prefs.getString("provider_name", "") == "Ollama (Local)"
+        val baseUrl = if (wasOllama) {
+            (prefs.getString("provider_base_url", DEFAULT_OLLAMA_URL) ?: DEFAULT_OLLAMA_URL)
+                .trim().trimEnd('/').ifBlank { DEFAULT_OLLAMA_URL }
+        } else DEFAULT_OLLAMA_URL
+        val model = if (wasOllama) {
+            (prefs.getString("provider_model", DEFAULT_OLLAMA_MODEL) ?: DEFAULT_OLLAMA_MODEL)
+                .trim().ifBlank { DEFAULT_OLLAMA_MODEL }
+        } else DEFAULT_OLLAMA_MODEL
+        // Deliberately route every request to local Ollama. No cloud or llama.cpp fallback.
+        if (!wasOllama || prefs.getString("provider_model", "").isNullOrBlank() ||
+            prefs.getString("provider_base_url", "").isNullOrBlank()) {
+            prefs.edit()
+                .putString("provider_name", "Ollama (Local)")
+                .putString("provider_base_url", baseUrl)
+                .putString("provider_api_key", "")
+                .putString("provider_model", model)
+                .apply()
         }
+        return OllamaProvider(baseUrl, model)
     }
     
     suspend fun complete(
@@ -62,28 +52,23 @@ class UniversalAdapter(private val context: Context) {
     
     fun saveSettings(name: String, baseUrl: String, apiKey: String, model: String) {
         prefs.edit().apply {
-            putString("provider_name", name)
-            putString("provider_base_url", baseUrl)
-            putString("provider_api_key", apiKey)
-            putString("provider_model", model)
+            putString("provider_name", "Ollama (Local)")
+            putString("provider_base_url", baseUrl.trim().trimEnd('/').ifBlank { DEFAULT_OLLAMA_URL })
+            putString("provider_api_key", "")
+            putString("provider_model", model.trim().ifBlank { DEFAULT_OLLAMA_MODEL })
             apply()
         }
     }
     
-    fun getProviderName(): String = prefs.getString("provider_name", "Groq") ?: "Groq"
+    fun getProviderName(): String = "Ollama (Local)"
     
     companion object {
         private var modelManager: ModelManager? = null
         
-        val AVAILABLE_PROVIDERS = listOf(
-            "Groq",
-            "Google Gemini",
-            "OpenRouter",
-            "Anthropic Claude",
-            "OpenAI",
-            "Ollama (Local)",
-            "Local (LlamaCpp)"
-        )
+        const val DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
+        const val DEFAULT_OLLAMA_MODEL = "qwen2.5:1.5b"
+
+        val AVAILABLE_PROVIDERS = listOf("Ollama (Local)")
         
         fun getModelManager(context: Context): ModelManager {
             return modelManager ?: synchronized(this) {
@@ -105,8 +90,8 @@ class UniversalAdapter(private val context: Context) {
             "OpenRouter" -> "meta-llama/llama-3-8b-instruct:free"
             "Anthropic Claude" -> "claude-haiku-4-20250514"
             "OpenAI" -> "gpt-4o-mini"
-            "Ollama (Local)" -> "llama3"
-            else -> "gpt-4o-mini"
+            "Ollama (Local)" -> DEFAULT_OLLAMA_MODEL
+            else -> DEFAULT_OLLAMA_MODEL
         }
     }
 }
