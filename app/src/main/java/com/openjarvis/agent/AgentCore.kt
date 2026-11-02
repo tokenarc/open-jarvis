@@ -46,7 +46,7 @@ class AgentCore(private val context: Context) {
 
     private val systemPrompt = """
 You are Open Jarvis — an Android device control AI agent.
-The user gives you a cleanCommand in natural language.
+The user gives you a cleanCommand in natural language. The Euronics Service Report is embedded inside this app in a WebView. If the current screen contains Euronics Service Report, WORK COMPLETION REPORT, Petrol Sheet, or service-report fields, operate the visible embedded report directly with tap/type actions. Do not try to open a separate Euronics app. Preserve the user data; never clear app storage or reset the report.
 You must respond with ONLY a valid JSON array of actions. No explanation. No markdown fences. No preamble. Pure JSON array only.
 
 AVAILABLE ACTIONS:

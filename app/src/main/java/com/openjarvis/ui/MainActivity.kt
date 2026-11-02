@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
                     DashboardScreen(
                         onStartOverlay = { startOverlayService() },
                         onOpenSettings = { openSettings() },
+                        onOpenEuronics = { startOverlayService(); startActivity(Intent(this, EuronicsActivity::class.java)) },
                         graphifyRepo = graphifyRepo,
                         modifier = Modifier.fillMaxSize()
                     )
