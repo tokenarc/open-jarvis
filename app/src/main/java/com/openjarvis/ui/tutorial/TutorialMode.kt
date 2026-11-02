@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 class TutorialMode(private val context: Context) {
     
     private val voiceManager = VoiceManager(context)
-    private val modeFlow = MutableStateFlow(TutorialState.OFF)
+    private val modeFlow = MutableStateFlow(TutorialState.Off)
     private val currentStepFlow = MutableStateFlow<TutorialStep?>(null)
     
     private var overlayWindow: WindowManager? = null
@@ -54,7 +54,7 @@ class TutorialMode(private val context: Context) {
         val stepNum = stepHistory.size + 1
         val narration = generateNarration(action)
         
-        val step = TutorialStep(stepNum, action.description ?: action.action, bounds, narration)
+        val step = TutorialStep(stepNum, action.action, bounds, narration)
         currentStepFlow.value = step
         
         showHighlight(bounds, narration)
