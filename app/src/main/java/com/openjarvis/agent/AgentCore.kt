@@ -52,17 +52,11 @@ You must respond with ONLY a valid JSON array of actions. No explanation. No mar
 AVAILABLE ACTIONS:
 open_app     → {"action":"open_app","package":"com.package","label":"AppName"}
 tap          → {"action":"tap","text":"Button text on screen"}
-tap_coords   → {"action":"tap_coords","x":540,"y":960}
-long_press   → {"action":"long_press","text":"Element text"}
 type         → {"action":"type","value":"text to type"}
-clear_type   → {"action":"clear_type","value":"clears field then types"}
-swipe        → {"action":"swipe","direction":"up|down|left|right","distance":"short|medium|long"}
-scroll       → {"action":"scroll","direction":"up|down"}
 press_back   → {"action":"press_back"}
 press_home   → {"action":"press_home"}
 press_recents → {"action":"press_recents"}
 wait_for     → {"action":"wait_for","text":"expected text","timeout_ms":3000}
-screenshot   → {"action":"screenshot"}
 read_screen  → {"action":"read_screen"}
 ai_prompt    → {"action":"ai_prompt","package":"com.openai.chatgpt","prompt":"{prompt}","outputKey":"result"}
 extract_text → {"action":"extract_text","outputKey":"page_text"}
@@ -401,19 +395,20 @@ RULES:
                     if (packageName != null) {
                         val meta = AIApps.KNOWN_AI_APPS[packageName]
 
-                        if (meta != null) {
-                            aiAppInteractor.openAIApp(meta)
-                            kotlinx.coroutines.delay(2000)
-                            aiAppInteractor.typePrompt(prompt)
-                            kotlinx.coroutines.delay(1000)
-
-                            val response =
-                                aiAppInteractor.waitForResponse()
-
-                            if (outputKey != null) {
-                                workingMemory.set(outputKey, response)
-                            }
+                        if (meta == null) {
+                            _state.value = AgentState.Error("Unsupported AI app: $packageName")
+                            return
                         }
+                        aiAppInteractor.openAIApp(meta)
+                        kotlinx.coroutines.delay(2000)
+                        aiAppInteractor.typePrompt(prompt)
+                        kotlinx.coroutines.delay(1000)
+                        val response = aiAppInteractor.waitForResponse()
+                        if (response.isBlank()) {
+                            _state.value = AgentState.Error("AI app did not return a response")
+                            return
+                        }
+                        if (outputKey != null) workingMemory.set(outputKey, response)
                     }
                 }
 
