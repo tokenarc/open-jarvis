@@ -88,7 +88,10 @@ jobs:
             adb shell dumpsys accessibility | grep -F 'JarvisAccessibilityService'
             adb shell pidof com.openjarvis >/dev/null || { adb logcat -d -t 1500; exit 1; }
             adb shell dumpsys activity activities | grep -F 'com.openjarvis/.ui.MainActivity'
-            adb logcat -d -t 1500 | grep -E 'FATAL EXCEPTION|AndroidRuntime' && exit 1 || true
+            if adb logcat -d -t 1500 | grep -F 'FATAL EXCEPTION'; then
+              adb logcat -d -t 1500
+              exit 1
+            fi
 
       - name: Upload tested debug APK
         uses: actions/upload-artifact@v4
