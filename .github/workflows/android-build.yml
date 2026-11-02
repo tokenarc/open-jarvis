@@ -58,7 +58,13 @@ jobs:
           script: |
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb shell pm grant com.openjarvis android.permission.RECORD_AUDIO
-            adb shell am start -n com.openjarvis/.ui.MainActivity
-            sleep 8
-            adb shell pidof com.openjarvis
-            adb shell dumpsys activity activities | grep -q 'com.openjarvis/.ui.MainActivity'
+            adb shell settings put secure enabled_accessibility_services com.openjarvis/com.openjarvis.accessibility.JarvisAccessibilityService
+            adb shell settings put secure accessibility_enabled 1
+            adb shell am start -W -n com.openjarvis/.ui.MainActivity
+            sleep 6
+            adb shell dumpsys accessibility | grep -F 'JarvisAccessibilityService'
+            if ! adb shell pidof com.openjarvis; then
+              adb logcat -d -t 1500
+              exit 1
+            fi
+            adb shell dumpsys activity activities | grep -F 'com.openjarvis/.ui.MainActivity'
