@@ -67,14 +67,8 @@ jobs:
             adb shell am start -W -n com.openjarvis/.ui.MainActivity
             sleep 6
             adb shell dumpsys accessibility | grep -F 'JarvisAccessibilityService'
-            if ! adb shell pidof com.openjarvis; then
-              adb logcat -d -t 1500
-              exit 1
-            fi
+            adb shell pidof com.openjarvis >/dev/null || { adb logcat -d -t 1500; exit 1; }
             adb shell dumpsys activity activities | grep -F 'com.openjarvis/.ui.MainActivity'
             adb shell am start -W -n com.openjarvis/.ui.EuronicsActivity
-            for i in $(seq 1 15); do
-              if adb logcat -d | grep -F 'EURONICS_HTML_TITLE:'; then break; fi
-              sleep 1
-            done
+            sleep 12
             adb logcat -d | grep -F 'EURONICS_HTML_TITLE:'
