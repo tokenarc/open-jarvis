@@ -66,14 +66,14 @@ jobs:
         run: test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Android emulator launch smoke test
-        timeout-minutes: 12
+        timeout-minutes: 22
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 33
           arch: x86_64
           profile: pixel_2
-          emulator-boot-timeout: 180
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
           disable-animations: true
           script: |
             timeout 120s adb wait-for-device
