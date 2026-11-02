@@ -17,7 +17,7 @@ class AndroidTTSEngine(private val context: Context) {
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 isReady = true
-                tts?.language = Locale.US
+                tts?.language = Locale.forLanguageTag("hi-IN")
                 tts?.setSpeechRate(speechRate)
                 tts?.setPitch(pitch)
                 
@@ -39,6 +39,7 @@ class AndroidTTSEngine(private val context: Context) {
             .trim()
         
         if (clean.isBlank()) return
+        configureVoiceForText(clean)
         
         val utteranceId = "jarvis_${UUID.randomUUID()}"
         tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
@@ -53,9 +54,28 @@ class AndroidTTSEngine(private val context: Context) {
             .trim()
         
         if (clean.isBlank()) return
+        configureVoiceForText(clean)
         
         val utteranceId = "jarvis_${UUID.randomUUID()}"
         tts?.speak(clean, TextToSpeech.QUEUE_ADD, null, utteranceId)
+    }
+
+    private fun configureVoiceForText(text: String) {
+        val hasDevanagari = text.any { it in '\u0900'..'\u097F' }
+        if (!hasDevanagari) return
+
+        val marathiMarkers = listOf("आहे", "आणि", "मला", "काय", "करा", "झाले", "नाही", "दाखवा", "उघडा", "करायचे", "माझे")
+        val language = if (marathiMarkers.any { text.contains(it) }) "mr" else "hi"
+        val locale = Locale.forLanguageTag("$language-IN")
+        val engine = tts ?: return
+        val bestVoice = engine.voices
+            ?.filter { it.locale.language == language && it.locale.country.equals("IN", ignoreCase = true) }
+            ?.maxByOrNull { it.quality }
+        if (bestVoice != null) {
+            engine.voice = bestVoice
+        } else {
+            engine.language = locale
+        }
     }
 
     fun stop() {
