@@ -27,6 +27,7 @@ fun SelfRepairDashboardDialog(onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     var ollamaStatus by remember { mutableStateOf("Not checked") }
     var patchStatus by remember { mutableStateOf("") }
+    var patchPayload by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var events by remember { mutableStateOf(repairCenter.events()) }
 
@@ -60,8 +61,11 @@ fun SelfRepairDashboardDialog(onDismiss: () -> Unit) {
                 Button(enabled = !busy && events.isNotEmpty(), onClick = {
                     busy = true
                     scope.launch {
-                        patchStatus = repairCenter.generatePatchProposal(events.first()).fold(
-                            { it.take(2200) }, { "Patch generation failed: ${it.message}" }
+                        val proposal = repairCenter.generatePatchProposal(events.first())
+                        patchPayload = proposal.getOrNull().orEmpty()
+                        patchStatus = proposal.fold(
+                            { if (it.length > 2200) it.take(2200) + "\\n… preview truncated; full patch will be copied" else it },
+                            { "Patch generation failed: ${it.message}" }
                         )
                         events = repairCenter.events()
                         busy = false
@@ -69,11 +73,11 @@ fun SelfRepairDashboardDialog(onDismiss: () -> Unit) {
                 }, modifier = Modifier.fillMaxWidth()) { Text("Analyze Latest Error + Generate Patch") }
                 if (busy) LinearProgressIndicator()
                 if (patchStatus.isNotBlank()) Text(patchStatus)
-                val hasPatch = patchStatus.contains("--- ") && patchStatus.contains("+++ ") && !patchStatus.contains("NO_SAFE_PATCH")
+                val hasPatch = patchPayload.contains("--- ") && patchPayload.contains("+++ ") && patchPayload != "NO_SAFE_PATCH"
                 if (hasPatch) {
                     OutlinedButton(
                         onClick = {
-                            val payload = Base64.encodeToString(patchStatus.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+                            val payload = Base64.encodeToString(patchPayload.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText("Open Jarvis repair patch (base64)", payload))
                             Toast.makeText(context, "Patch payload copied. Paste it into patch_b64 in GitHub Actions.", Toast.LENGTH_LONG).show()
