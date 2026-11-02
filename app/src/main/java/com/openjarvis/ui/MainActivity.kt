@@ -1,16 +1,20 @@
 package com.openjarvis.ui
 
+import android.Manifest
 import android.content.ComponentName
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import com.openjarvis.accessibility.JarvisAccessibilityService
@@ -23,12 +27,26 @@ import com.openjarvis.ui.settings.SettingsScreen
 import com.openjarvis.ui.theme.OpenJarvisTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val requestMicPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        Toast.makeText(
+            this,
+            if (granted) "Microphone enabled" else "Microphone permission is required for voice input",
+            Toast.LENGTH_LONG
+        ).show()
+    }
     
     private lateinit var graphifyRepo: GraphifyRepository
     private lateinit var agentCore: AgentCore
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
         
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -61,6 +79,7 @@ class MainActivity : ComponentActivity() {
                     DashboardScreen(
                         onStartOverlay = { startOverlayService() },
                         onOpenSettings = { openSettings() },
+                        onOpenEuronics = { startOverlayService(); startActivity(Intent(this, EuronicsActivity::class.java)) },
                         graphifyRepo = graphifyRepo,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -89,7 +108,7 @@ class MainActivity : ComponentActivity() {
     }
     
     private fun startOverlayService() {
-        startService(Intent(this, OverlayService::class.java))
+        OverlayService.start(this)
         Toast.makeText(this, "Jarvis is active", Toast.LENGTH_SHORT).show()
     }
     

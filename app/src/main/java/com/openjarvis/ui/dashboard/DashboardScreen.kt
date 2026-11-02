@@ -21,11 +21,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,6 +44,7 @@ import kotlinx.coroutines.delay
 fun DashboardScreen(
     onStartOverlay: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenEuronics: () -> Unit,
     graphifyRepo: GraphifyRepository,
     modifier: Modifier = Modifier
 ) {
@@ -87,7 +91,17 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(56.dp))
             
             HeroSection(isSystemActive = isSystemActive)
-            
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = onOpenEuronics,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Violet)
+            ) {
+                Text("EURONICS SERVICE REPORT", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             
             StatsRow(tasks = recentTasks, alpha = statsAlpha)
@@ -107,6 +121,17 @@ fun DashboardScreen(
             onSettingsClick = onOpenSettings,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+
+        FloatingActionButton(
+            onClick = onStartOverlay,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = 88.dp),
+            containerColor = VoidColor.Violet,
+            contentColor = Color.White
+        ) {
+            Text("J", fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -276,7 +301,7 @@ private fun StatsRow(tasks: List<TaskNode>, alpha: Float) {
         label = "count"
     )
     
-    Column(alpha = alpha) {
+    Column(modifier = Modifier.alpha(alpha)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -336,7 +361,7 @@ private fun StatCard(count: Int, label: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun RecentTasksSection(tasks: List<TaskNode>, alpha: Float) {
-    Column(alpha = alpha) {
+    Column(modifier = Modifier.alpha(alpha)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -505,7 +530,7 @@ private fun AppInitialBadge(label: String) {
 
 @Composable
 private fun QuickAppsSection(apps: List<AppNode>, alpha: Float) {
-    Column(alpha = alpha) {
+    Column(modifier = Modifier.alpha(alpha)) {
         Text(
             text = "QUICK APPS",
             style = TextStyle(

@@ -11,16 +11,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -33,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openjarvis.llm.UniversalAdapter
 import com.openjarvis.ui.theme.VoidColor
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -40,22 +43,58 @@ fun SettingsScreen(
     onSaveProvider: (String, String, String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedProvider by remember { mutableStateOf("Groq") }
-    var baseUrl by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("llama-3.1-70b-versatile") }
+    val context = LocalContext.current
+    val providerPrefs = remember {
+        val key = androidx.security.crypto.MasterKey.Builder(context)
+            .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        androidx.security.crypto.EncryptedSharedPreferences.create(
+            context,
+            "jarvis_encrypted_prefs",
+            key,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
+    val voicePrefs = remember {
+        val masterKey = androidx.security.crypto.MasterKey.Builder(context)
+            .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        androidx.security.crypto.EncryptedSharedPreferences.create(
+            context,
+            "voice_prefs",
+            masterKey,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
+    val savedProvider = "Ollama (Local)"
+    val previousProvider = providerPrefs.getString("provider_name", "") ?: ""
+    val savedModel = if (previousProvider == "Ollama (Local)") providerPrefs.getString("provider_model", "") ?: "" else ""
+    val migratedModel = savedModel.ifBlank { UniversalAdapter.DEFAULT_OLLAMA_MODEL }
+    var selectedProvider by remember { mutableStateOf(savedProvider) }
+    var baseUrl by remember {
+        mutableStateOf(
+            if (previousProvider == "Ollama (Local)") {
+                (providerPrefs.getString("provider_base_url", UniversalAdapter.DEFAULT_OLLAMA_URL)
+                    ?: UniversalAdapter.DEFAULT_OLLAMA_URL).ifBlank { UniversalAdapter.DEFAULT_OLLAMA_URL }
+            } else UniversalAdapter.DEFAULT_OLLAMA_URL
+        )
+    }
+    var apiKey by remember { mutableStateOf(providerPrefs.getString("provider_api_key", "") ?: "") }
+    var model by remember { mutableStateOf(migratedModel) }
     var showBaseUrlField by remember { mutableStateOf(false) }
     var showProvidersDropdown by remember { mutableStateOf(false) }
     var showPassword by remember { mutableStateOf(false) }
     var lastSaved by remember { mutableStateOf(0L) }
     var savedVisible by remember { mutableStateOf(false) }
-    var voiceEnabled by remember { mutableStateOf(false) }
-    var speakResults by remember { mutableStateOf(true) }
+    var voiceEnabled by remember { mutableStateOf(voicePrefs.getBoolean("voice_enabled", false)) }
+    var speakResults by remember { mutableStateOf(voicePrefs.getBoolean("speak_results", true)) }
     var speechRate by remember { mutableStateOf(1.05f) }
     var sttMode by remember { mutableStateOf("Push to Talk") }
     
     LaunchedEffect(selectedProvider) {
-        showBaseUrlField = selectedProvider == "Custom"
+        showBaseUrlField = selectedProvider == "Custom" || selectedProvider == "Ollama (Local)"
     }
     
     val scrollState = rememberScrollState()
@@ -107,7 +146,9 @@ fun SettingsScreen(
                     onValueChange = { apiKey = it },
                     label = "API Key",
                     isFocused = false,
-                    isPassword = !showPassword,
+                    isPassword = true,
+                    showPassword = showPassword,
+                    visible = selectedProvider != "Ollama (Local)",
                     onTogglePassword = { showPassword = !showPassword }
                 )
                 
@@ -119,7 +160,7 @@ fun SettingsScreen(
                 )
                 
                 Text(
-                    text = "Works with any OpenAI-compatible API",
+                    text = "Ollama local model only · no cloud AI or API key",
                     style = TextStyle(
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight(400),
@@ -131,6 +172,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 TestConnectionButton(
+                    provider = selectedProvider,
                     apiKey = apiKey,
                     baseUrl = baseUrl,
                     model = model,
@@ -151,7 +193,7 @@ fun SettingsScreen(
                     title = "Voice Assistant",
                     subtitle = "Push to Talk · VAD supported",
                     enabled = voiceEnabled,
-                    onToggle = { voiceEnabled = !voiceEnabled }
+                    onToggle = { voiceEnabled = !voiceEnabled; voicePrefs.edit().putBoolean("voice_enabled", voiceEnabled).apply() }
                 )
                 
                 if (voiceEnabled) {
@@ -161,7 +203,7 @@ fun SettingsScreen(
                         title = "Speak Results",
                         subtitle = "Jarvis reads results aloud",
                         enabled = speakResults,
-                        onToggle = { speakResults = !speakResults }
+                        onToggle = { speakResults = !speakResults; voicePrefs.edit().putBoolean("speak_results", speakResults).apply() }
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))
@@ -248,7 +290,7 @@ fun SettingsScreen(
                                     )
                                 )
                                 Text(
-                                    text = "Google Speech · Online",
+                                    text = "Android speech · offline when language packs are installed",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
                                         fontWeight = FontWeight(400),
@@ -258,7 +300,7 @@ fun SettingsScreen(
                                 )
                             }
                             Text(
-                                text = "Ready",
+                                text = "Check offline packs",
                                 style = TextStyle(
                                     fontFamily = FontFamily.Default,
                                     fontWeight = FontWeight(500),
@@ -322,7 +364,7 @@ private fun SettingsHeader(onNavigateBack: () -> Unit) {
     ) {
         IconButton(onClick = onNavigateBack) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                imageVector = Icons.Filled.KeyboardArrowLeft,
                 contentDescription = "Back",
                 tint = VoidColor.TextSecondary
             )
@@ -410,7 +452,7 @@ private fun ProviderSelectorCard(
             )
             
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                imageVector = Icons.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = VoidColor.TextDisabled,
                 modifier = Modifier.graphicsLayer(rotationZ = rotationAngle)
@@ -507,6 +549,7 @@ fun FloatingLabelTextField(
     label: String,
     isFocused: Boolean,
     isPassword: Boolean = false,
+    showPassword: Boolean = false,
     visible: Boolean = true,
     onTogglePassword: (() -> Unit)? = null
 ) {
@@ -575,12 +618,15 @@ fun FloatingLabelTextField(
 
 @Composable
 private fun TestConnectionButton(
+    provider: String,
     apiKey: String,
     baseUrl: String,
     model: String,
     onSave: (String, String, String, String) -> Unit
 ) {
     var testState by remember { mutableStateOf<TestState>(TestState.Idle) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     
     val borderColor by animateColorAsState(
         targetValue = when (testState) {
@@ -602,8 +648,19 @@ private fun TestConnectionButton(
     
     OutlinedButton(
         onClick = {
-            onSave("Groq", baseUrl, apiKey, model)
-            testState = TestState.Success(150)
+            if (apiKey.isBlank() && provider != "Ollama (Local)" && provider != "Local (LlamaCpp)") {
+                testState = TestState.Error("API key is required")
+            } else {
+                testState = TestState.Loading
+                onSave(provider, baseUrl, apiKey, model)
+                scope.launch {
+                    val result = UniversalAdapter(context).testConnection()
+                    testState = result.fold(
+                        onSuccess = { TestState.Success(it) },
+                        onFailure = { TestState.Error(it.message ?: "Connection failed") }
+                    )
+                }
+            }
         },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -625,7 +682,7 @@ private fun TestConnectionButton(
                 Text("Connected — ${state.ms}ms")
             }
             is TestState.Error -> {
-                Text("Failed — check key")
+                Text("Failed — ${state.message}")
             }
         }
     }
@@ -768,7 +825,7 @@ private fun PermissionRow(
             }
             
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                imageVector = Icons.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = VoidColor.Red
             )

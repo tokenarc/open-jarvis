@@ -65,7 +65,8 @@ class ScreenWatcher(private val context: Context, private val agentCore: com.ope
             val battery = getBatteryLevel()
             val now = System.currentTimeMillis()
             
-            for (rule in rules) {
+            for (ruleIndex in rules.indices) {
+                val rule = rules[ruleIndex]
                 if (!rule.enabled) continue
                 if (now - rule.lastTriggered < rule.cooldownMs) continue
                 
@@ -87,7 +88,7 @@ class ScreenWatcher(private val context: Context, private val agentCore: com.ope
                 
                 if (triggered) {
                     executeAction(rule.action, screenText)
-                    rule.lastTriggered = now
+                    rules[ruleIndex] = rule.copy(lastTriggered = now)
                 }
             }
         } catch (e: Exception) {
