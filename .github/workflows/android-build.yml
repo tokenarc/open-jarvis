@@ -39,3 +39,10 @@ jobs:
 
       - name: Compile debug APK
         run: gradle --no-daemon :app:assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-jarvis-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
