@@ -29,6 +29,24 @@ object ErrorDiagnosis {
             "model" in detail && ("not found" in detail || "does not exist" in detail) ->
                 Diagnosis("JARVIS-OLLAMA-002", stage, "Configured Ollama model is missing",
                     "Pull the configured model in Ollama, then test the connection again.", false)
+            "accessibility service unavailable" in detail ->
+                Diagnosis("JARVIS-ACCESS-001", stage, "Android Accessibility Service is not connected",
+                    "Enable Open Jarvis Accessibility Service in Android Settings, then retry.", false)
+            "app not found" in detail ->
+                Diagnosis("JARVIS-APP-001", stage, "The requested app could not be matched to an installed app",
+                    "Check the app name or install the app, then use its visible launcher name.", false)
+            "could not tap" in detail || "tap failed" in detail ->
+                Diagnosis("JARVIS-UI-001", stage, "The requested screen control was not found or could not be tapped",
+                    "Keep the target screen visible and use the exact button or label text shown on screen.", true)
+            "could not type" in detail || "input field not found" in detail ->
+                Diagnosis("JARVIS-UI-002", stage, "No editable input field was available",
+                    "Tap the intended text field first and confirm the keyboard or cursor is visible.", true)
+            "timed out waiting" in detail ->
+                Diagnosis("JARVIS-UI-003", stage, "Expected screen text did not appear before timeout",
+                    "Check whether the app loaded or whether the expected label differs from the screen text.", true)
+            "action not supported" in detail || "unsupported action" in detail ->
+                Diagnosis("JARVIS-ACTION-001", stage, "The generated action is not implemented by the executor",
+                    "Use a supported action or add and test an executor implementation before using it.", false)
             "http 429" in detail ->
                 Diagnosis("JARVIS-OLLAMA-429", stage, "Ollama server is overloaded",
                     "Wait briefly and retry after the model finishes its current request.", true)
