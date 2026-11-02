@@ -47,7 +47,13 @@ class SignedUpdateManager(private val context: Context) {
         return Verification(true, "APK digest, package and signing certificate verified")
     }
 
-    fun requestInstall(apk: File) {
+    fun verifyAndRequestInstall(apk: File, expectedSha256: String): Verification {
+        val result = verifyApk(apk, expectedSha256)
+        if (result.valid) requestInstallVerified(apk)
+        return result
+    }
+
+    private fun requestInstallVerified(apk: File) {
         val uri: Uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
