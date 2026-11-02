@@ -45,13 +45,13 @@ object LLMResponseValidator {
                 parsed.getJSONObject(i)
             } catch (e: Exception) {
                 errors.add("Item $i is not an object")
-                continue
+                return ValidationResult(false, emptyList(), errors, false)
             }
             
             val actionType = obj.optString("action", "")
             if (actionType.isBlank()) {
                 errors.add("Item $i missing 'action' field")
-                continue
+                return ValidationResult(false, emptyList(), errors, false)
             }
             
             if (actionType !in knownActions) {
