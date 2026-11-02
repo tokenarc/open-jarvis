@@ -222,7 +222,9 @@ Actions: [$actionsJson]
             llmHint = "Custom action sequence",
             actionTemplate = actions,
             successVerification = "Task completed",
-            tags = listOf("generated", "custom")
+            tags = listOf("generated", "custom"),
+            usageCount = 0,
+            successRate = 1f
         )
     }
     
