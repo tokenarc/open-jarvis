@@ -25,7 +25,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
 
 class AgentCore(private val context: Context) {
 
@@ -44,7 +43,6 @@ class AgentCore(private val context: Context) {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val taskMutex = Mutex()
-    private val nullRepairAttempts = ConcurrentHashMap.newKeySet<String>()
 
     private val _state = MutableStateFlow<AgentState>(AgentState.Idle)
     val state: StateFlow<AgentState> = _state
@@ -241,7 +239,6 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                             currentStage = "post-task analysis"
                             analysisEngine.analyzeLastTask()
 
-                            nullRepairAttempts.remove(cleanCommand.trim().lowercase())
                             selfHealing.recordSuccess(safeCommand)
                             repairMemory.recordRecovery("TASK-EXECUTION")
                             _state.value =
@@ -352,8 +349,14 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                         _state.value = AgentState.Error("App not found: ${label ?: "missing package name"}")
                         return
                     }
-                    val service = JarvisAccessibilityService.instance
-                    if (service == null || !service.openAppByPackage(packageName)) {
+                    var service = JarvisAccessibilityService.instance
+                    var opened = service?.openAppByPackage(packageName) == true
+                    if (!opened) {
+                        kotlinx.coroutines.delay(600)
+                        service = JarvisAccessibilityService.instance
+                        opened = service?.openAppByPackage(packageName) == true
+                    }
+                    if (!opened) {
                         _state.value = AgentState.Error("Could not open app: ${label ?: packageName}")
                         return
                     }
@@ -362,8 +365,16 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
 
                 Action.TAP -> {
                     val target = action.text
-                    val service = JarvisAccessibilityService.instance
-                    if (target.isNullOrBlank() || service == null || !service.tapByText(target)) {
+                    var service = JarvisAccessibilityService.instance
+                    var tapped = !target.isNullOrBlank() && service?.tapByText(target) == true
+                    if (!tapped && !target.isNullOrBlank()) {
+                        // Refresh the accessibility tree once before retrying a failed tap.
+                        kotlinx.coroutines.delay(350)
+                        screenReader.extractAllText()
+                        service = JarvisAccessibilityService.instance
+                        tapped = service?.tapByText(target) == true
+                    }
+                    if (!tapped) {
                         _state.value = AgentState.Error("Could not tap screen text: ${target ?: "missing target"}")
                         return
                     }
@@ -418,7 +429,11 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                 }
 
                 Action.READ_SCREEN -> {
-                    val screen = screenReader.extractAllText()
+                    var screen = screenReader.extractAllText()
+                    if (screen.isBlank()) {
+                        kotlinx.coroutines.delay(350)
+                        screen = screenReader.extractAllText()
+                    }
                     if (screen.isBlank()) {
                         _state.value = AgentState.Error("Could not read current screen")
                         return
