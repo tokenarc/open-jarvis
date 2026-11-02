@@ -236,8 +236,8 @@ class OpenAIProvider(
 }
 
 class OllamaProvider(
-    override val baseUrl: String,
-    private val model: String = "llama3"
+    override val baseUrl: String = "http://127.0.0.1:11434",
+    private val model: String = "qwen2.5:1.5b"
 ) : LLMProvider {
     
     override val name: String = "Ollama"
@@ -271,12 +271,15 @@ class OllamaProvider(
             HttpClient.client.newCall(request).execute().use { response ->
                 val body = response.body?.string() ?: throw Exception("Empty response")
                 val json = JSONObject(body)
+                if (!response.isSuccessful) {
+                    throw Exception("Ollama HTTP ${response.code}: ${json.optString("error", body)}")
+                }
                 if (json.has("message")) {
                     json.getJSONObject("message").getString("content")
                 } else if (json.has("error")) {
                     throw Exception(json.getString("error"))
                 } else {
-                    throw Exception("Unknown response: $body")
+                    throw Exception("Ollama returned an unexpected response")
                 }
             }
         }
@@ -285,18 +288,22 @@ class OllamaProvider(
     override suspend fun testConnection(): Result<Long> = withContext(Dispatchers.IO) {
         runCatching {
             val startTime = System.currentTimeMillis()
-            val requestBody = JSONObject().apply {
-                put("model", model)
-            }.toString()
-            
             val request = Request.Builder()
                 .url("$baseUrl/api/tags")
-                .post(requestBody.toRequestBody("application/json".toMediaType()))
+                .get()
                 .build()
-            
+
             HttpClient.client.newCall(request).execute().use { response ->
+                val body = response.body?.string() ?: throw Exception("Empty response from Ollama")
                 if (!response.isSuccessful) {
-                    throw Exception("HTTP ${response.code}")
+                    throw Exception("Ollama HTTP ${response.code}: $body")
+                }
+                val models = JSONObject(body).optJSONArray("models") ?: JSONArray()
+                val installed = (0 until models.length()).any { index ->
+                    models.optJSONObject(index)?.optString("name")?.equals(model, ignoreCase = true) == true
+                }
+                if (!installed) {
+                    throw Exception("Ollama is running, but model '$model' is not installed. In Termux run: ollama pull $model")
                 }
             }
             System.currentTimeMillis() - startTime
