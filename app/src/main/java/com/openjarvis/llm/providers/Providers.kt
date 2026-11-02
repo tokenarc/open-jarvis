@@ -262,6 +262,8 @@ class OllamaProvider(
                 put("stream", false)
                 put("format", JSONObject().apply {
                     put("type", "array")
+                    put("minItems", 1)
+                    put("maxItems", 8)
                     put("items", JSONObject().apply {
                         put("type", "object")
                         put("properties", JSONObject().apply {
