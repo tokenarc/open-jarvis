@@ -44,6 +44,7 @@ import kotlinx.coroutines.delay
 fun DashboardScreen(
     onStartOverlay: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenEuronics: () -> Unit,
     graphifyRepo: GraphifyRepository,
     modifier: Modifier = Modifier
 ) {
@@ -90,7 +91,17 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(56.dp))
             
             HeroSection(isSystemActive = isSystemActive)
-            
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = onOpenEuronics,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Violet)
+            ) {
+                Text("EURONICS SERVICE REPORT", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             
             StatsRow(tasks = recentTasks, alpha = statsAlpha)
