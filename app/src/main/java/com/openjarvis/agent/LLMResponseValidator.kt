@@ -7,11 +7,9 @@ import org.json.JSONObject
 object LLMResponseValidator {
     
     private val knownActions = setOf(
-        "open_app", "tap", "tap_coords", "long_press", "type",
-        "clear_type", "swipe", "scroll", "press_back", "press_home",
-        "press_recents", "wait_for", "screenshot", "read_screen",
-        "ai_prompt", "mcp_call", "reply_notification",
-        "read_clipboard", "write_clipboard", "highlight_element", "error"
+        "open_app", "tap", "type", "press_back", "press_home",
+        "press_recents", "wait_for", "read_screen", "ai_prompt",
+        "extract_text", "error"
     )
     
     fun validate(rawResponse: String): ValidationResult {
@@ -57,8 +55,8 @@ object LLMResponseValidator {
             }
             
             if (actionType !in knownActions) {
-                errors.add("Unknown action type: $actionType — skipping")
-                continue
+                errors.add("Unsupported action type: $actionType")
+                return ValidationResult(false, emptyList(), errors, false)
             }
             
             actions.add(parseAction(obj))
