@@ -214,7 +214,7 @@ RULES:
                             executeActions(actions)
 
                             graphifyRepo.logTask(
-                                cleanCommand = safeCommand,
+                                command = safeCommand,
                                 result = "success",
                                 provider = universalAdapter.getProviderName(),
                                 latencyMs = latency
