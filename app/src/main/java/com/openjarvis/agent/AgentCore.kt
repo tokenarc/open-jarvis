@@ -36,6 +36,7 @@ class AgentCore(private val context: Context) {
     private val taskRouter = TaskRouter(context)
     private val appAnalyzer = AppAnalyzer(context)
     private val aiAppInteractor = AIAppInteractor(context)
+    private val repairMemory = RepairMemory(context)
 
     private var workingMemory = TaskWorkingMemory()
 
@@ -88,7 +89,7 @@ RULES:
         scope.launch {
             taskMutex.withLock {
                 try {
-                    val normalizedCommand = CommandDictionary.normalize(cleanCommand)
+                    val normalizedCommand = repairMemory.normalize(CommandDictionary.normalize(cleanCommand))
                     val sanitized = PromptSanitizer.sanitize(normalizedCommand)
 
                     when (sanitized) {
@@ -140,7 +141,7 @@ RULES:
                                 "No recent tasks"
                             } else {
                                 memoryContext
-                            }
+                            } + "\\n" + repairMemory.summary()
                         )
 
                     _state.value = AgentState.Running("thinking...")
@@ -157,6 +158,7 @@ RULES:
                             var validation =
                                 LLMResponseValidator.validate(rawJson)
                             var responseForDiagnostics = rawJson
+                            var planAutoRepaired = false
 
                             // One bounded repair pass for malformed/empty model output. No device
                             // action is executed until a complete plan passes validation.
@@ -179,6 +181,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                                 if (!repairedResponse.isNullOrBlank()) {
                                     responseForDiagnostics = repairedResponse
                                     validation = LLMResponseValidator.validate(repairedResponse)
+                                    planAutoRepaired = validation.isValid
                                 }
                             }
 
@@ -187,6 +190,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                                 val reason = validation.errors.firstOrNull() ?: "Empty action plan"
                                 val diagnosis = ErrorDiagnosis.invalidPlan(reason)
                                 val detail = "raw=" + responseForDiagnostics.take(240).replace("\n", " ")
+                                repairMemory.recordFailure(diagnosis.code, diagnosis.stage)
                                 _state.value = AgentState.Error(diagnosis.display(detail))
                                 graphifyRepo.logTask(safeCommand, "failed: ${diagnosis.display(detail)}", universalAdapter.getProviderName(), latency)
                                 return@fold
@@ -205,11 +209,16 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                                     IllegalStateException(executionState.message),
                                     "Action execution"
                                 )
+                                repairMemory.recordFailure(diagnosis.code, diagnosis.stage)
                                 _state.value = AgentState.Error(diagnosis.display(executionState.message))
                                 graphifyRepo.logTask(safeCommand, "failed: ${diagnosis.display(executionState.message)}", universalAdapter.getProviderName(), latency)
                                 return@fold
                             }
 
+                            if (cleanCommand.trim() != safeCommand.trim()) {
+                                repairMemory.rememberVerifiedCorrection(cleanCommand, safeCommand)
+                            }
+                            if (planAutoRepaired) repairMemory.recordRecovery("JARVIS-JSON-001")
                             graphifyRepo.logTask(
                                 command = safeCommand,
                                 result = "success",
@@ -228,6 +237,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                             val detail = "${error.javaClass.simpleName}: ${error.message ?: error.cause?.message ?: "no error message"}"
                             val diagnosis = ErrorDiagnosis.fromThrowable(error, "Ollama request")
                             val msg = diagnosis.display(detail)
+                            repairMemory.recordFailure(diagnosis.code, diagnosis.stage)
                             _state.value = AgentState.Error(msg)
 
                             graphifyRepo.logTask(
@@ -241,6 +251,7 @@ Preserve the user's original intent. Never invent a destructive or sensitive act
                 } catch (e: Exception) {
                     Log.e("JarvisAgent", "Unhandled agent exception", e)
                     val detail = "${e.javaClass.simpleName}: ${e.message ?: e.cause?.message ?: "no error message"}"
+                    repairMemory.recordFailure("JARVIS-UNKNOWN-001", "Agent pipeline")
                     _state.value = AgentState.Error("Agent failure [$detail]")
 
                     graphifyRepo.logTask(
