@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Base64
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -75,7 +76,7 @@ fun SelfRepairDashboardDialog(onDismiss: () -> Unit) {
                             val payload = Base64.encodeToString(patchStatus.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText("Open Jarvis repair patch (base64)", payload))
-                            patchStatus = "Patch payload copied. Open the GitHub repair workflow and paste it into patch_b64."
+                            Toast.makeText(context, "Patch payload copied. Paste it into patch_b64 in GitHub Actions.", Toast.LENGTH_LONG).show()
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("Copy GitHub Patch Payload") }
