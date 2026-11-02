@@ -74,6 +74,16 @@ class OverlayService : Service() {
                 }
             }
         }
+        serviceScope.launch {
+            agentCore.state.collect { state ->
+                when (state) {
+                    is com.openjarvis.agent.AgentState.Idle -> statusText?.text = "Ready — type a command or use mic"
+                    is com.openjarvis.agent.AgentState.Running -> statusText?.text = state.step
+                    is com.openjarvis.agent.AgentState.Done -> statusText?.text = state.result
+                    is com.openjarvis.agent.AgentState.Error -> statusText?.text = "Jarvis error: ${state.message}"
+                }
+            }
+        }
         serviceScope.launch(Dispatchers.IO) { recentTasks = graphifyRepo.getRecentTasks(10) }
     }
 
@@ -204,17 +214,13 @@ class OverlayService : Service() {
             statusText?.text = "Type a command first"
             return
         }
+        if (com.openjarvis.accessibility.JarvisAccessibilityService.instance == null) {
+            statusText?.text = "Accessibility service is OFF. Enable Open Jarvis in Android Accessibility settings."
+            return
+        }
         statusText?.text = "Jarvis is working…"
         agentCore.executeTask(command)
         commandInput?.text?.clear()
-        serviceScope.launch {
-            delay(500)
-            when (val state = agentCore.state.value) {
-                is com.openjarvis.agent.AgentState.Error -> statusText?.text = state.message
-                is com.openjarvis.agent.AgentState.Done -> statusText?.text = state.result
-                else -> statusText?.text = "Command sent — processing"
-            }
-        }
     }
 
     private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
