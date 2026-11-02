@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 class TutorialMode(private val context: Context) {
     
     private val voiceManager = VoiceManager(context)
-    private val modeFlow = MutableStateFlow(TutorialState.Off)
+    private val modeFlow = MutableStateFlow<TutorialState>(TutorialState.Off)
     private val currentStepFlow = MutableStateFlow<TutorialStep?>(null)
     
     private var overlayWindow: WindowManager? = null
