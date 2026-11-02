@@ -31,13 +31,13 @@ class AnalysisEngine(context: Context) {
 
         val hashCounts = mutableMapOf<String, Int>()
         for (seq in sequences) {
-            val hash = hashSequence(seq)
+            val hash = AnalysisAlgorithms.hashSequence(seq)
             hashCounts[hash] = hashCounts.getOrDefault(hash, 0) + 1
         }
 
         for ((sequence, count) in hashCounts) {
             if (count >= 2) {
-                val existing = repo.getPatternByHash(hashSequence(sequence))
+                val existing = repo.getPatternByHash(AnalysisAlgorithms.hashSequence(sequence))
                 val now = System.currentTimeMillis()
 
                 if (existing != null) {
@@ -51,7 +51,7 @@ class AnalysisEngine(context: Context) {
 
                     repo.insertPattern(
                         PatternNode(
-                            sequenceHash = hashSequence(sequence),
+                            sequenceHash = AnalysisAlgorithms.hashSequence(sequence),
                             sequenceString = sequence,
                             occurrenceCount = count,
                             lastSeen = now,
@@ -101,7 +101,7 @@ class AnalysisEngine(context: Context) {
                 val name = match.groupValues.getOrNull(1)?.trim() ?: continue
                 if (name.isBlank()) continue
 
-                val dist = levenshteinDistance(name, "john")
+                val dist = AnalysisAlgorithms.levenshteinDistance(name, "john")
                 val existing = repo.findContactByName(name)
                 
                 if (existing != null) {
@@ -149,13 +149,18 @@ class AnalysisEngine(context: Context) {
         }
     }
 
-    private fun hashSequence(sequence: String): String {
+
+}
+
+/** Pure deterministic algorithms shared by AnalysisEngine and JVM regression tests. */
+internal object AnalysisAlgorithms {
+    fun hashSequence(sequence: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val hashBytes = digest.digest(sequence.toByteArray())
         return hashBytes.joinToString("") { "%02x".format(it) }.take(16)
     }
 
-    private fun levenshteinDistance(s1: String, s2: String): Int {
+    fun levenshteinDistance(s1: String, s2: String): Int {
         val len1 = s1.length
         val len2 = s2.length
         val dp = Array(len1 + 1) { IntArray(len2 + 1) }
