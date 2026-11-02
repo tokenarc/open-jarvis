@@ -39,6 +39,13 @@ fun SelfRepairDashboardDialog(onDismiss: () -> Unit) {
                             busy = false
                         }
                     }) { Text("Check Ollama") }
+                    OutlinedButton(enabled = !busy, onClick = {
+                        busy = true
+                        scope.launch {
+                            ollamaStatus = repairCenter.pullConfiguredModel().fold({ it }, { "Model recovery failed: ${it.message}" })
+                            busy = false
+                        }
+                    }) { Text("Pull / Recover Model") }
                     OutlinedButton(onClick = { health.openAccessibilitySettings() }) {
                         Text(if (health.accessibilityEnabled()) "Accessibility ON" else "Fix Accessibility")
                     }
