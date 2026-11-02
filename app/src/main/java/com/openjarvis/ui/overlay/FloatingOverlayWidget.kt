@@ -47,6 +47,7 @@ import com.openjarvis.voice.VoiceManager
 import com.openjarvis.voice.VoiceManager.VoiceState
 import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun FloatingOverlayWidget(
     agentState: AgentState,
@@ -88,17 +89,8 @@ fun FloatingOverlayWidget(
     AnimatedContent(
         targetState = isExpanded,
         transitionSpec = {
-            val expand = expandHorizontally(
-                animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = 0.8f)
-            ) + expandVertically(
-                animationSpec = spring(stiffness = 260f, dampingRatio = 0.8f)
-            ) + fadeIn(animationSpec = tween(150, delayMillis = 240))
-            val shrink = shrinkHorizontally(
-                animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = 0.8f)
-            ) + shrinkVertically(
-                animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = 0.8f)
-            ) + fadeOut(animationSpec = tween(100))
-            if (targetState) expand with shrink else shrink with expand
+            fadeIn(animationSpec = tween(180)) with
+                fadeOut(animationSpec = tween(120))
         },
         label = "overlay_expand"
     ) { expanded ->
