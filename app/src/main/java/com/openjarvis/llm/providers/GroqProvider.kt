@@ -36,8 +36,11 @@ class GroqProvider(
                         put("content", userMessage)
                     })
                 })
-                put("max_tokens", 1024)
+                put("max_completion_tokens", 1024)
                 put("temperature", 0.1)
+                put("reasoning_effort", "low")
+                put("reasoning_format", "hidden")
+                put("response_format", JSONObject().put("type", "json_object"))
                 put("stream", false)
             }.toString()
             
