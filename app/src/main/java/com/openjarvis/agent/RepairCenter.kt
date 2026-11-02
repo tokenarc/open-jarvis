@@ -122,7 +122,11 @@ ${event.stackTrace.take(7000)}
                 http.newCall(request).execute().use { response ->
                     val raw = response.body?.string().orEmpty()
                     check(response.isSuccessful) { "Ollama HTTP ${response.code}: ${raw.take(400)}" }
-                    val proposal = JSONObject(raw).optJSONObject("message")?.optString("content").orEmpty().trim()
+                    val rawProposal = JSONObject(raw).optJSONObject("message")?.optString("content").orEmpty().trim()
+                    val proposal = rawProposal
+                        .replace(Regex("""^\`\`\`(?:diff)?\\s*"""), "")
+                        .replace(Regex("""\\s*\`\`\`$"""), "")
+                        .trim()
                     check(proposal.isNotBlank()) { "Ollama returned an empty patch proposal" }
                     val safe = if (proposal == "NO_SAFE_PATCH") proposal else {
                         check(RepairPatchPolicy.validateDiff(proposal)) {
