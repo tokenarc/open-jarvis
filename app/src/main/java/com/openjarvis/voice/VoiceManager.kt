@@ -101,9 +101,6 @@ class VoiceManager(private val context: Context) {
                 onResult = { text ->
                     if (!text.isNullOrBlank()) {
                         _state.value = VoiceState.Result(text)
-                        if (isSpeakResultsEnabled()) {
-                            ttsEngine.speak("Heard: $text")
-                        }
                     } else {
                         _state.value = VoiceState.Error("Could not understand audio")
                     }
