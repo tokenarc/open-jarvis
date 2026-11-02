@@ -110,6 +110,17 @@ fun DashboardScreen(
             onSettingsClick = onOpenSettings,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+
+        FloatingActionButton(
+            onClick = onStartOverlay,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = 88.dp),
+            containerColor = VoidColor.Violet,
+            contentColor = Color.White
+        ) {
+            Text("J", fontWeight = FontWeight.Bold)
+        }
     }
 }
 
