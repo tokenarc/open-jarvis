@@ -3,6 +3,7 @@ package com.openjarvis.agent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ResolveInfo
+import android.util.Log
 import com.openjarvis.accessibility.JarvisAccessibilityService
 import com.openjarvis.accessibility.ScreenReader
 import com.openjarvis.graphify.AnalysisEngine
@@ -204,8 +205,10 @@ RULES:
                                 error.message?.contains("Unable to resolve") == true ->
                                     "Network error — check connection"
 
-                                else ->
-                                    error.message ?: "Unknown error"
+                                else -> {
+                                    Log.e("JarvisAgent", "Ollama/agent request failed", error)
+                                    "Agent failure [${error.javaClass.simpleName}]: ${error.message ?: error.cause?.message ?: "no error message"}"
+                                }
                             }
 
                             _state.value = AgentState.Error(msg)
@@ -219,13 +222,13 @@ RULES:
                         }
                     )
                 } catch (e: Exception) {
-                    _state.value = AgentState.Error(
-                        e.message ?: "Unknown error"
-                    )
+                    Log.e("JarvisAgent", "Unhandled agent exception", e)
+                    val detail = "${e.javaClass.simpleName}: ${e.message ?: e.cause?.message ?: "no error message"}"
+                    _state.value = AgentState.Error("Agent failure [$detail]")
 
                     graphifyRepo.logTask(
                         cleanCommand,
-                        "failed: ${e.message}",
+                        "failed: $detail",
                         "",
                         0
                     )
