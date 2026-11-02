@@ -77,10 +77,6 @@ jobs:
           disable-animations: true
           script: |
             timeout 120s adb wait-for-device
-            for i in $(seq 1 60); do
-              [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')" = "1" ] && break
-              sleep 2
-            done
             [ "$(adb shell getprop sys.boot_completed | tr -d '\\r')" = "1" ]
             timeout 120s adb install -r -t app/build/outputs/apk/debug/app-debug.apk
             adb shell pm grant com.openjarvis android.permission.RECORD_AUDIO
