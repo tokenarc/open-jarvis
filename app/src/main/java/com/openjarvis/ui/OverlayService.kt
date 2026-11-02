@@ -52,6 +52,7 @@ class OverlayService : Service() {
     private var recentTasks = emptyList<TaskNode>()
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var isExpanded = false
+    private var responseLanguage = "hi"
 
     override fun onCreate() {
         super.onCreate()
@@ -82,11 +83,11 @@ class OverlayService : Service() {
                     is com.openjarvis.agent.AgentState.Running -> statusText?.text = state.step
                     is com.openjarvis.agent.AgentState.Done -> {
                         statusText?.text = state.result
-                        voiceManager.speak("काम पूरा हुआ")
+                        voiceManager.speak(if (responseLanguage == "mr") "काम पूर्ण झाले आहे" else "काम पूरा हुआ")
                     }
                     is com.openjarvis.agent.AgentState.Error -> {
                         statusText?.text = "Jarvis error: ${state.message}"
-                        voiceManager.speak("कमांड पूरी नहीं हुई। ${state.message}")
+                        voiceManager.speak(if (responseLanguage == "mr") "कमांड पूर्ण झाली नाही. ${state.message}" else "कमांड पूरी नहीं हुई। ${state.message}")
                     }
                 }
             }
@@ -221,6 +222,10 @@ class OverlayService : Service() {
         if (command.isBlank()) {
             statusText?.text = "Type a command first"
             return
+        }
+        if (command.any { it in '\u0900'..'\u097F' }) {
+            val marathiMarkers = listOf("आहे", "आणि", "मला", "काय", "झाले", "झालं", "नाही", "दाखवा", "उघडा", "करायचे", "माझे", "तुम्ही", "सांगा", "नको")
+            responseLanguage = if (marathiMarkers.any { command.contains(it) }) "mr" else "hi"
         }
         if (com.openjarvis.accessibility.JarvisAccessibilityService.instance == null) {
             statusText?.text = "Accessibility service is OFF. Enable Open Jarvis in Android Accessibility settings."
