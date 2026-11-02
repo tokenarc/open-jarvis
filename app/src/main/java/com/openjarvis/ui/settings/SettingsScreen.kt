@@ -675,7 +675,7 @@ private fun TestConnectionButton(
                 Text("Connected — ${state.ms}ms")
             }
             is TestState.Error -> {
-                Text("Failed — \${state.message}")
+                Text("Failed — ${state.message}")
             }
         }
     }
