@@ -13,7 +13,7 @@ import org.json.JSONObject
 
 class GroqProvider(
     private val apiKey: String,
-    private val model: String = "llama-3.1-70b-versatile"
+    private val model: String = "openai/gpt-oss-120b"
 ) : LLMProvider {
     
     override val name: String = "Groq"
