@@ -124,6 +124,7 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
             }
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, preferredLanguage)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, preferredLanguage)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             if (android.os.Build.VERSION.SDK_INT >= 34) {
                 putExtra("android.speech.extra.ENABLE_LANGUAGE_DETECTION", true)
                 putStringArrayListExtra(
