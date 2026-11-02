@@ -2,7 +2,7 @@ name: Android Build
 
 on:
   push:
-    branches: [main, feature/euronics-webview-integration]
+    branches: [main, feature/euronics-webview-integration, feature/self-healing-command-dictionary]
     paths:
       - "app/**"
       - "*.gradle"
