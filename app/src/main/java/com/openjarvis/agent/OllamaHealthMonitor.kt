@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import androidx.core.accessibilityservice.AccessibilityServiceInfoCompat
 import android.view.accessibility.AccessibilityManager
 import com.openjarvis.accessibility.JarvisAccessibilityService
 import kotlinx.coroutines.Dispatchers
