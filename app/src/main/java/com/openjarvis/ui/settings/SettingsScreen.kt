@@ -75,8 +75,10 @@ fun SettingsScreen(
     var selectedProvider by remember { mutableStateOf(savedProvider) }
     var baseUrl by remember {
         mutableStateOf(
-            (providerPrefs.getString("provider_base_url", UniversalAdapter.DEFAULT_OLLAMA_URL)
-                ?: UniversalAdapter.DEFAULT_OLLAMA_URL).ifBlank { UniversalAdapter.DEFAULT_OLLAMA_URL }
+            if (previousProvider == "Ollama (Local)") {
+                (providerPrefs.getString("provider_base_url", UniversalAdapter.DEFAULT_OLLAMA_URL)
+                    ?: UniversalAdapter.DEFAULT_OLLAMA_URL).ifBlank { UniversalAdapter.DEFAULT_OLLAMA_URL }
+            } else UniversalAdapter.DEFAULT_OLLAMA_URL
         )
     }
     var apiKey by remember { mutableStateOf(providerPrefs.getString("provider_api_key", "") ?: "") }

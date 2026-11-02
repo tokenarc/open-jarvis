@@ -21,13 +21,18 @@ class UniversalAdapter(private val context: Context) {
     )
     
     fun getActiveProvider(): LLMProvider {
-        val baseUrl = (prefs.getString("provider_base_url", DEFAULT_OLLAMA_URL) ?: DEFAULT_OLLAMA_URL)
-            .trim().trimEnd('/').ifBlank { DEFAULT_OLLAMA_URL }
-        val model = (prefs.getString("provider_model", DEFAULT_OLLAMA_MODEL) ?: DEFAULT_OLLAMA_MODEL)
-            .trim().ifBlank { DEFAULT_OLLAMA_MODEL }
+        val wasOllama = prefs.getString("provider_name", "") == "Ollama (Local)"
+        val baseUrl = if (wasOllama) {
+            (prefs.getString("provider_base_url", DEFAULT_OLLAMA_URL) ?: DEFAULT_OLLAMA_URL)
+                .trim().trimEnd('/').ifBlank { DEFAULT_OLLAMA_URL }
+        } else DEFAULT_OLLAMA_URL
+        val model = if (wasOllama) {
+            (prefs.getString("provider_model", DEFAULT_OLLAMA_MODEL) ?: DEFAULT_OLLAMA_MODEL)
+                .trim().ifBlank { DEFAULT_OLLAMA_MODEL }
+        } else DEFAULT_OLLAMA_MODEL
         // Deliberately route every request to local Ollama. No cloud or llama.cpp fallback.
-        if (prefs.getString("provider_name", "") != "Ollama (Local)" ||
-            prefs.getString("provider_model", "").isNullOrBlank()) {
+        if (!wasOllama || prefs.getString("provider_model", "").isNullOrBlank() ||
+            prefs.getString("provider_base_url", "").isNullOrBlank()) {
             prefs.edit()
                 .putString("provider_name", "Ollama (Local)")
                 .putString("provider_base_url", baseUrl)
