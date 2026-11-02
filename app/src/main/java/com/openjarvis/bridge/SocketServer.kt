@@ -46,7 +46,7 @@ class SocketServer(
     }
     
     companion object {
-        private const val SOCKET_NAME = "jarvis.port"
+        const val SOCKET_NAME = "jarvis.port"
         private const val MAX_COMMAND_LENGTH = 2000
         private const val MAX_REQUESTS_PER_SECOND = 10
     }
@@ -213,33 +213,33 @@ class SocketServer(
         job.join()
     }
 
-    private fun parseRequest(line: String): Pair<String, String>? {
-        return try {
-            val json = org.json.JSONObject(line)
-            val cmd = json.optString("cmd", "")
-            val requestId = json.optString("requestId", "")
-            
-            if (cmd.isBlank()) null
-            else Pair(requestId, cmd)
-        } catch (e: Exception) {
-            null
-        }
+    private fun parseRequest(line: String): Pair<String, String>? =
+        SocketProtocol.parseRequest(line)
+
+    internal fun createErrorResponse(requestId: String, error: String): String =
+        SocketProtocol.createErrorResponse(requestId, error)
+
+    internal fun escapeJson(s: String): String = SocketProtocol.escapeJson(s)
+}
+
+/** Pure socket JSON helpers kept separate so they can be regression-tested on the JVM. */
+internal object SocketProtocol {
+    fun parseRequest(line: String): Pair<String, String>? = try {
+        val json = org.json.JSONObject(line)
+        val cmd = json.optString("cmd", "")
+        val requestId = json.optString("requestId", "")
+        if (cmd.isBlank()) null else Pair(requestId, cmd)
+    } catch (_: Exception) {
+        null
     }
 
-    internal fun createErrorResponse(requestId: String, error: String): String {
-        return """{"requestId":"$requestId","status":"error","result":"$error"}"""
-    }
+    fun createErrorResponse(requestId: String, error: String): String =
+        """{"requestId":"$requestId","status":"error","result":"$error"}"""
 
-    internal fun escapeJson(s: String): String {
-        return s
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-    }
-
-    companion object {
-        const val SOCKET_NAME = "jarvis.port"
-    }
+    fun escapeJson(value: String): String = value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
 }

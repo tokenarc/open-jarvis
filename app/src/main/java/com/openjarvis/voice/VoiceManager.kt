@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 
 class VoiceManager(private val context: Context) {
 
@@ -100,9 +101,6 @@ class VoiceManager(private val context: Context) {
                 onResult = { text ->
                     if (!text.isNullOrBlank()) {
                         _state.value = VoiceState.Result(text)
-                        if (isSpeakResultsEnabled()) {
-                            ttsEngine.speak("Heard: $text")
-                        }
                     } else {
                         _state.value = VoiceState.Error("Could not understand audio")
                     }

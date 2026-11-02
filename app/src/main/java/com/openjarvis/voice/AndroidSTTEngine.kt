@@ -82,10 +82,18 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
                         SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy"
                         SpeechRecognizer.ERROR_SERVER -> "Server error"
                         SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timeout"
-                        else -> "Unknown error"
+                        SpeechRecognizer.ERROR_TOO_MANY_REQUESTS -> "Too many voice requests; wait a moment and retry"
+                        SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> "Speech service disconnected; check the phone speech service"
+                        SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> "Selected speech language is not supported"
+                        SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> "Speech language pack is not installed or unavailable"
+                        SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT -> "Speech service cannot check language support"
+                        SpeechRecognizer.ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS -> "Speech service does not support language-pack status"
+                        else -> "Speech recognition error"
                     }
+                    android.util.Log.e("OpenJarvisSTT", "SpeechRecognizer error=$error message=$errorMessage")
+                    val detailedMessage = "$errorMessage (code $error)"
                     if (pendingResult.isNullOrBlank()) {
-                        currentErrorCallback?.invoke(errorMessage)
+                        currentErrorCallback?.invoke(detailedMessage)
                     }
                 }
 
@@ -116,14 +124,39 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
 
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            val deviceLanguage = Locale.getDefault().language
+            val preferredLanguage = when {
+                deviceLanguage == "mr" -> "mr-IN"
+                deviceLanguage == "en" -> "en-IN"
+                else -> "hi-IN"
+            }
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, preferredLanguage)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, preferredLanguage)
+            // Speech-to-text uses Android's selected recognition service. Ollama remains
+            // the only AI reasoning provider; allow network STT if offline packs are absent.
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_CONFIDENCE_THRESHOLD, 0.1f)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_TIMEOUT_MS)
         }
 
-        recognizer?.startListening(intent)
+        mainHandler.post {
+            if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+                currentErrorCallback?.invoke("No Android speech recognition service is installed/enabled")
+                return@post
+            }
+            val activeRecognizer = recognizer
+            if (activeRecognizer == null) {
+                currentErrorCallback?.invoke("Speech recognizer is still initializing; tap the mic again")
+                return@post
+            }
+            try {
+                activeRecognizer.startListening(intent)
+            } catch (e: Exception) {
+                android.util.Log.e("OpenJarvisSTT", "Unable to start speech recognition", e)
+                currentErrorCallback?.invoke("Could not start microphone: ${e.javaClass.simpleName}")
+            }
+        }
     }
 
     private fun stopListeningEarly() {

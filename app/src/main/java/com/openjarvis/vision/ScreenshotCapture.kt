@@ -12,6 +12,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.DisplayMetrics
 import android.view.WindowManager
+import android.hardware.display.DisplayManager
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
@@ -24,6 +25,9 @@ class ScreenshotCapture(private val context: Context) {
     private var handlerThread: HandlerThread? = null
     private var handler: Handler? = null
     private var isCapturing = false
+    private var captureWidth = 0
+    private var captureHeight = 0
+    private var captureDensityDpi = 0
 
     fun startCapture(): Boolean {
         val projectionManager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -48,6 +52,9 @@ class ScreenshotCapture(private val context: Context) {
         val width = metrics.widthPixels
         val height = metrics.heightPixels
         val density = metrics.densityDpi
+        captureWidth = width
+        captureHeight = height
+        captureDensityDpi = density
 
         handlerThread = HandlerThread("ScreenshotThread").apply { start() }
         handler = Handler(handlerThread!!.looper)
@@ -73,10 +80,10 @@ class ScreenshotCapture(private val context: Context) {
         try {
             mediaProjection?.createVirtualDisplay(
                 "Screenshot",
-                surface.width,
-                surface.height,
-                surface.allocation,
-                surface.allocation,
+                captureWidth,
+                captureHeight,
+                captureDensityDpi,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 surface,
                 null,
                 handler
