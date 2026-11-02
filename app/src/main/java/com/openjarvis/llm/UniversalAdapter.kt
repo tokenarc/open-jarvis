@@ -82,7 +82,7 @@ class UniversalAdapter(private val context: Context) {
         }
         
         fun isLocalModelLoaded(): Boolean {
-            return modelManager?.state?.value is ModelManager.ModelState.ModelLoaded
+            return modelManager?.state?.value is ModelManager.ModelState.Loaded
         }
         
         suspend fun loadLocalModel(tier: ModelManager.ModelTier): Result<Unit> {

@@ -10,7 +10,7 @@ class SelfHealingExecutor(private val context: Context) {
 
     private val screenReader = ScreenReader(context)
     private val graphifyRepo = GraphifyRepository(context)
-    private val llm = UniversalAdapter.getModelManager(context)
+    private val llm = UniversalAdapter(context)
 
     private val maxAttempts = 3
     private val baseDelayMs = 1000L
@@ -41,11 +41,10 @@ class SelfHealingExecutor(private val context: Context) {
         )
 
         val alternativeResponse: String? = try {
-            val response = llm.complete(
+            llm.complete(
                 healingPrompt.first,
                 healingPrompt.second
-            )
-            response?.toString()
+            ).getOrNull()
         } catch (e: Exception) {
             null
         }
@@ -149,7 +148,7 @@ class SelfHealingExecutor(private val context: Context) {
     ): Pair<String, String> {
 
         val system = """
-Action failed: ${action.description ?: action.action}
+Action failed: ${action.action}
 Expected to see: ${context.expectedState ?: "task completion"}
 Current screen shows: ${currentScreen.take(500)}
 Attempt: $attempt/$maxAttempts
